@@ -10,11 +10,12 @@
         $(document).ready(function (){
             $('form#test_connect').submit(function(event) {
                 console.log("start connection");
-                requestConnection($('#target').val());
+                postFile($('#target').val());
                 return false;
             });
         })
     </script>
+    <link rel="stylesheet" href="{{ url_for('static',filename='style/peer.css') }}">
 
 </head>
 <p id="my_sid">my sid</p>
@@ -26,8 +27,24 @@
 </form>
 <div>
     <form>
-        <input type="file">
+        <input id="fileChooser" type="file" multiple="multiple" onchange="addFile()">
     </form>
+</div>
+<div id="fileList">
+    <table class="pure-table">
+        <thead>
+            <tr>
+                <th>File id</th>
+                <th>File name</th>
+                <th>File size</th>
+                <th>File url</th>
+                <th>File delete</th>
+            </tr>
+        </thead>
+        <tbody id="fileListTable" >
+
+        </tbody>
+    </table>
 </div>
 <body>
 

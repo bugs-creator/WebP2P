@@ -1,3 +1,4 @@
+import uuid
 from threading import Lock
 from flask import Flask, render_template, session, request, \
     copy_current_request_context
@@ -6,7 +7,6 @@ from flask_socketio import SocketIO, emit, join_room, leave_room, \
 from flask_sqlalchemy import SQLAlchemy
 
 from config import Config
-
 
 # Set this variable to "threading", "eventlet" or "gevent" to test the
 # different async modes, or leave it set to None for the application to choose
@@ -17,7 +17,7 @@ app = Flask(__name__)
 # 加载配置文件
 app.config.from_object(Config)
 # db绑定app
-db=SQLAlchemy(app)
+db = SQLAlchemy(app)
 import models
 from models import *
 
@@ -27,13 +27,14 @@ thread = None
 thread_lock = Lock()
 
 
-
 def sendToOneUser(target, msgString):
     pass
 
+
 @socketio.event
 def request_file(message):
-    pass
+    res = Res.query.get(message["id"])
+    emit(message["id"],{'peer':res.peer[0].id,'fileInfo':{'id':res.id,'name':res.name,'size':res.size}})
 
 
 def background_thread():
@@ -45,39 +46,54 @@ def background_thread():
         socketio.emit('my_response',
                       {'data': 'Server generated event', 'count': count})
 
+
 @app.route("/test")
 def test():
-    return render_template('test.html',async_mode=socketio.async_mode)
+    return render_template('test.html', async_mode=socketio.async_mode)
 
 
 @app.route("/")
 def peer():
-    return render_template('peer.html',async_mode=socketio.async_mode)
+    return render_template('peer.html', async_mode=socketio.async_mode)
+
 
 @app.route('/index')
 def index():
     return render_template('index.html', async_mode=socketio.async_mode)
 
+
 @socketio.event
 def sendTo(message):
     print(message)
-    emit(message["head"],{'from':request.sid,'data':message["data"]},to=message["target"])
+    emit(message["head"], {'from': request.sid, 'data': message["data"]}, to=message["target"])
+
+
+@socketio.event
+def addFile(message):
+    id = str(uuid.uuid1())
+    res = models.Res(id=str(id), name=message["name"], size=message["size"])
+    res.peer += [Peer.query.get(request.sid)]
+    db.session.add(res)
+    db.session.commit()
+    emit(str(message["count"]), {"id": str(id)})
 
 
 @socketio.event
 def requestOffer(message):
     print(message)
-    emit("requestOffer",{'from':request.sid,'offer':message["offer"]},to=message["target"])
+    emit("requestOffer", {'from': request.sid, 'offer': message["offer"]}, to=message["target"])
+
 
 @socketio.event
 def replyOffer(message):
     print(message)
-    emit("replyOffer",{'from':request.sid,'offer':message["offer"]},to=message["target"])
+    emit("replyOffer", {'from': request.sid, 'offer': message["offer"]}, to=message["target"])
+
 
 @socketio.event
 def my_event(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
-    print("get event: "+request.sid)
+    print("get event: " + request.sid)
     emit('my_response',
          {'data': message['data'], 'count': session['receive_count']})
 
@@ -91,40 +107,9 @@ def my_broadcast_event(message):
 
 
 @socketio.event
-def join():
-    emit('join',
-         {'sid':request.sid})
-
-
-@socketio.event
-def leave(message):
-    leave_room(message['room'])
-    session['receive_count'] = session.get('receive_count', 0) + 1
-    emit('my_response',
-         {'data': 'In rooms: ' + ', '.join(rooms()),
-          'count': session['receive_count']})
-
-
-@socketio.on('close_room')
-def on_close_room(message):
-    session['receive_count'] = session.get('receive_count', 0) + 1
-    emit('my_response', {'data': 'Room ' + message['room'] + ' is closing.',
-                         'count': session['receive_count']},
-         to=message['room'])
-    close_room(message['room'])
-
-
-@socketio.event
-def my_room_event(message):
-    session['receive_count'] = session.get('receive_count', 0) + 1
-    emit('my_response',
-         {'data': message['data'], 'count': session['receive_count']},
-         to=message['room'])
-
-
-@socketio.event
 def test_connect(message):
     print(message["target"])
+
 
 @socketio.event
 def disconnect_request():
@@ -146,8 +131,6 @@ def my_ping():
     emit('my_pong')
 
 
-
-
 @socketio.event
 def connect():
     global thread
@@ -157,14 +140,18 @@ def connect():
     with thread_lock:
         if thread is None:
             thread = socketio.start_background_task(background_thread)
-    emit('my_response', {'data': 'Connected', 'count': 0})
+    emit('join', {'sid': request.sid})
 
 
 @socketio.on('disconnect')
-def test_disconnect():
+def disconnect():
     peer = Peer.query.get(request.sid)
+    for res in peer.res:
+        if res.peer.__len__() == 1:
+            db.session.delete(res)
     db.session.delete(peer)
     db.session.commit()
 
+
 if __name__ == '__main__':
-    socketio.run(app,debug=True)
+    socketio.run(app, debug=True)
