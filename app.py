@@ -61,7 +61,7 @@ def index():
 @socketio.event
 def sendTo(message):
     print(message)
-    emit("sendTo",{'from':request.sid,'data':message["data"]},to=message["target"])
+    emit(message["head"],{'from':request.sid,'data':message["data"]},to=message["target"])
 
 
 @socketio.event
@@ -91,12 +91,9 @@ def my_broadcast_event(message):
 
 
 @socketio.event
-def join(message):
-    join_room(message['room'])
-    session['receive_count'] = session.get('receive_count', 0) + 1
-    emit('my_response',
-         {'data': 'In rooms: ' + ', '.join(rooms()),
-          'count': session['receive_count']})
+def join():
+    emit('join',
+         {'sid':request.sid})
 
 
 @socketio.event
@@ -170,4 +167,4 @@ def test_disconnect():
     db.session.commit()
 
 if __name__ == '__main__':
-    socketio.run(app)
+    socketio.run(app,debug=True)

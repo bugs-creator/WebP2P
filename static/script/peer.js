@@ -48,14 +48,14 @@ socket.on('requestOffer', async function (message){
     }
 
     function onReceiveMessageCallback(event) {
-      console.log(`Received Message ${event.data.byteLength}`);
-      receiveBuffer.push(event.data);
-      receivedSize += event.data.byteLength;
+      console.log(`Received Message ${event.data}`);
+      // receiveBuffer.push(event.data);
+      // receivedSize += event.data.byteLength;
       // receiveProgress.value = receivedSize;
 
       // we are assuming that our signaling protocol told
       // about the expected file size (and name, hash, etc).
-      const file = fileInput.files[0];
+      // const file = fileInput.files[0];
       // if (receivedSize === file.size) {
       //   const received = new Blob(receiveBuffer);
       //   receiveBuffer = [];
@@ -86,7 +86,6 @@ socket.on('requestOffer', async function (message){
         console.log(`Receive channel state is: ${readyState}`);
         if (readyState === 'open') {
             console.log(`succeed!!!!!!!!!!!!!!`);
-
         }
       }
     }
@@ -127,13 +126,14 @@ $('form#test_connect').submit(function(event) {
 
 async function createPeerConnection(sid){
 
-function onSendChannelStateChange() {
+    function onSendChannelStateChange() {
       if (sendChannel) {
         const {readyState} = sendChannel;
         console.log(`Send channel state is: ${readyState}`);
         if (readyState === 'open') {
             console.log("success!!!!!!!!!!!!!!!!!")
           // sendData();
+            sendChannel.send("Test123456")
         }
       }
     }
