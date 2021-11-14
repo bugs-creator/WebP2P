@@ -204,7 +204,9 @@ async function createPeerConnection(target){
         peerConnection.addIceCandidate(message.data.ice);
     });
 
-    let dataChannel=peerConnection.createDataChannel('DataChannel');
+    let dataChannel=peerConnection.createDataChannel("label", {
+        ordered: true
+    });
     dataChannel.binaryType = 'arraybuffer';
 
 
