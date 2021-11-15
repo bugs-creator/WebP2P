@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Title</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.0.4/socket.io.js" integrity="sha512-aMGMvNYu8Ue4G+fHa359jcPb1u+ytAF+P2SCb+PxrjCdO3n3ZTxJ30zuH39rimUggmTwmh2u7wvQsDTHESnmfQ==" crossorigin="anonymous"></script>
+{#    <script src="{{ url_for('static',filename='script/jquery.min.js') }}" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>#}
+{#    <script src="{{ url_for('static',filename='script/socket.io.js') }}" integrity="sha512-aMGMvNYu8Ue4G+fHa359jcPb1u+ytAF+P2SCb+PxrjCdO3n3ZTxJ30zuH39rimUggmTwmh2u7wvQsDTHESnmfQ==" crossorigin="anonymous"></script>#}
+    <script src="{{ url_for('static',filename='script/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static',filename='script/socket.io.js') }}"></script>
     <script src="{{ url_for('static',filename='script/peer_new.js') }}"></script>
     <script type="text/javascript" charset="utf-8">
         $(document).ready(function (){
@@ -29,6 +31,21 @@
     <form>
         <input id="fileChooser" type="file" multiple="multiple" onchange="addFile()">
     </form>
+</div>
+<div id="downloadList">
+    <table class="pure-table">
+        <thead>
+            <tr>
+                <th>id</th>
+                <th>name</th>
+                <th>progress</th>
+                <th>option</th>
+            </tr>
+        </thead>
+        <tbody>
+
+        </tbody>
+    </table>
 </div>
 <div id="fileList">
     <table class="pure-table">
