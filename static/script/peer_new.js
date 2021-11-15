@@ -4,7 +4,7 @@
 var files=[];
 var socket=io();
 var my_sid=null;
-var chunk_size=16384;
+var chunk_size=32768;
 var temp_count=0;
 var table=document.getElementById("fileListTable");
 var num_work=10;
