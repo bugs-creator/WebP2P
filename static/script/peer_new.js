@@ -181,7 +181,7 @@ async function getFile(target, fileInfo){
     let download_chunk_num=0;
     let tempData={index:null,data:null};
     let receiveChannel;
-    let num_workers=100;
+    let num_workers=25;
     let work_cache=new Array(num_workers);
     let work_state=new Array(num_workers);
 
