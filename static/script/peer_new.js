@@ -7,6 +7,7 @@ var my_sid=null;
 var chunk_size=32768;
 var temp_count=0;
 var table=document.getElementById("fileListTable");
+var num_work=10;
 
 
 socket.on("join",function (message){
@@ -81,84 +82,31 @@ function readFileAsync(file) {
 
 
 socket.on("requestOffer",async function (message){
-    let obj=await listenConnection(message.from,message.data.offer);
-    let peerConnection=obj[0];
-    let sendChannel=obj[1];
-    let sendQueue=[];
-    let file=null;
-    let canSend=true;
-
-    sendChannel.addEventListener('open',async function (event) {
-        console.log('open ');
-        while(sendChannel.readyState==='open' && sendQueue.length!==0){
-            console.log("bufferAmount: ",sendChannel.bufferedAmount);
-            console.log("bufferAmountLow: ",sendChannel.bufferedAmountLowThreshold);
-            if(sendChannel.bufferedAmount<=1048576) {
-                let data = sendQueue.shift();
-                sendChannel.send(data[0]);
-                console.log('send ', data[0]);
-            }else{
-
-                await sleep(10);
-            }
-        }
-    });
-
-    sendChannel.onbufferedamountlow=function (event) {
-        // console.log("buffer low!!!!!!!!!");
-        canSend=false;
-    };
-
-    sendChannel.onerror=function (event) {
-        console.log("send error!!!!!!!!");
-    };
-
-    const sendMessage=async (message)=>{
-        sendQueue.push([message]);
-        while(sendChannel.readyState==='open' && sendQueue.length!==0){
-                            console.log("bufferAmount: ",sendChannel.bufferedAmount);
-                console.log("bufferAmountLow: ",sendChannel.bufferedAmountLowThreshold);
-            if(sendChannel.bufferedAmount<=1048576) {
-                let data = sendQueue.shift();
-                sendChannel.send(data[0]);
-                console.log('send ', data[0]);
-            }else{
-                await sleep(10);
-            }
-        }
-    };
+    let peerConnection=await listenConnection(message.from,message.data.offer);
 
 
-    const getSlice = index => {
-        console.log('getSlice ', index);
-        return file.slice(index*chunk_size, (index +1)* chunk_size);
-    };
-
-
-    peerConnection.addEventListener('datachannel', function (event) {
-            let receiveChannel = event.channel;
-            receiveChannel.binaryType = 'arraybuffer';
-            sendChannel.binaryType=  'arraybuffer';
-            receiveChannel.onmessage = async function (event) {
-                let data=JSON.parse(event.data);
-                console.log(`receive data:\n${event.data} `);
-                if(data.head==="requestFile"){
-                    let file_item;
-                    for(let item in files){
-                        file_item=files[item];
-                        if(file_item.id===data.content.fileId){
-                            file=file_item;
-                            break;
-                        }
-                    }
+    peerConnection.addEventListener("datachannel",
+            function (event) {
+            const dataChannel=event.channel;
+            dataChannel.binaryType = 'arraybuffer';
+            dataChannel.addEventListener('open', function (event) {
+                if(dataChannel.readyState==="open"){
+                    console.log("dataChannel is open");
+                    dataChannel.send("I'm ready");
                 }
-                if(data.head==="requestSlice"){
-                    let slice=await readFileAsync(getSlice(data.content.index));
-                    sendMessage(JSON.stringify({index:data.content.index}));
-                    sendMessage(slice);
-                }
+            });
+            dataChannel.addEventListener('close', function (event) {
+                console.log("dataChannel is close");
+            });
+            dataChannel.addEventListener('error', function (error) {
+                console.log("dataChannel error");
+            });
+            dataChannel.onmessage=async function(event){
+                console.log("receive: ",event.data);
+                dataChannel.send("I'm ready too");
             };
     });
+
 });
 
 
@@ -175,7 +123,7 @@ async function postFile(id){
 async function getFile(target, fileInfo){
     let obj=await requestConnection(target);
     let peerConnection=obj[0];
-    let sendChannel=obj[1];
+    let dataChannels=obj[1];
     let sendQueue=[];
     let chunk_num=Math.ceil(fileInfo.size/chunk_size);
     let download_chunk_num=0;
@@ -185,10 +133,6 @@ async function getFile(target, fileInfo){
     let work_cache=new Array(num_workers);
     let work_state=new Array(num_workers);
 
-    for(let i=0;i<num_workers;i++){
-        work_cache[i]=[];
-        work_state[i]={done:false,last:new Date().getTime()};
-    }
 
     let table=document.getElementById("downloadListTable");
     let tr=document.createElement("tr");
@@ -216,132 +160,24 @@ async function getFile(target, fileInfo){
     tr.appendChild(td4);
     table.appendChild(tr);
 
-    sendChannel.binaryType = 'arraybuffer';
-
-    sendChannel.addEventListener('open',function (event) {
-        console.log('open ');
-        while(sendChannel.readyState==='open' && sendQueue.length!==0){
-            let data=sendQueue.shift();
-            sendChannel.send(data[0]);
-        }
-    });
-
-    const sendMessage=message=>{
-        // console.log("send:\n",message);
-        sendQueue.push([message]);
-        while(sendChannel.readyState==='open' && sendQueue.length!==0){
-            let data=sendQueue.shift()[0];
-            sendChannel.send(data);
-        }
-    };
-
-
-    const requestSlice=pos=>{
-        let work=work_cache[pos];
-        if(work.length*num_workers+pos<=chunk_num-1) {
-            work_state[pos].last=new Date().getTime();
-            sendMessage(JSON.stringify({head: "requestSlice", content: {index: work.length * num_workers + pos}}));
-        }else{
-            work_state[pos].done=true;
-            console.log("work ",pos, "done!!");
-        }
-    };
-
-    const awakeWorker=(index,buffer)=>{
-
-        let pos=index%num_workers;
-        let sub_index=parseInt(index/num_workers);
-        let work=work_cache[pos];
-        console.log("awake:",index," worklen:",work.length," subIndex:",sub_index);
-        if(work.length-1<sub_index) {
-            work.push(buffer);
-            download_chunk_num++;
-            progress.value=download_chunk_num;
-            requestSlice(pos);
-        }
-    };
-
-
-    sendMessage(JSON.stringify({head:"requestFile",content:{fileId:fileInfo.id}}));
-
-
-    let last_num=0;
-    let last_time=0;
-
-    async function start(){
-        let flag=false;
-        console.log("start transmission");
-        while(!flag){
-            flag=true;
-            for(let i=0;i<num_workers;i++){
-                if((!work_state[i].done)&&((new Date().getTime()-work_state[i].last)>500)){
-                    requestSlice(i);
-                    // await sleep(500);
-                    console.log("packet loss");
-                }
-                flag=flag&&work_state[i].done;
+    for(let i=0;i<dataChannels.length;i++){
+        const dataChannel=dataChannels[i];
+        dataChannel.addEventListener('open', function (event) {
+            if(dataChannel.readyState==="open"){
+                console.log("dataChannel ",i," is open");
+                dataChannel.send("I'm ready");
             }
-            let time_pass=new Date().getTime()-last_time;
-            if(time_pass>1000){
-                last_time=new Date().getTime();
-                let number=chunk_size*(download_chunk_num-last_num);
-                last_num=download_chunk_num;
-                text.innerText=(1000*number/time_pass/1024/1024).toFixed(2)+"Mb/s";
-            }
-            await sleep(100);
-        }
-        let data=[];
-        for(let i=0;i<work_cache[0].length;i++){
-            for(let j=0;j<num_workers;j++) {
-                if(work_cache[j].length-1>=i) {
-                    data.push(work_cache[j][i]);
-                }
-            }
-        }
-        saveFile(fileInfo,data);
-        tr.remove();
-        peerConnection.close();
+        });
+        dataChannel.addEventListener('close', function (event) {
+            console.log("dataChannel ",i," is close");
+        });
+        dataChannel.addEventListener('error', function (error) {
+            console.log("dataChannel ",i," error");
+        });
+        dataChannel.onmessage=async function(event){
+            console.log("receive: ",event.data);
+        };
     }
-
-    start();
-
-    const receiveMessage=message=>{
-        if(typeof (message)==="string"){
-            tempData.index=JSON.parse(message).index;
-        }else if(message.byteLength!==undefined){
-            if(tempData.index!==null){
-                tempData.data=message;
-                awakeWorker(tempData.index,tempData.data);
-                tempData.index=null;
-                tempData.data=null;
-            }
-        }else{
-            console.log("error");
-            tempData.index=null;
-            tempData.data=null;
-        }
-    };
-
-
-
-
-    sendChannel.addEventListener('close', function (){onSendChannelStateChange(sendChannel);});
-    sendChannel.addEventListener('error', function (event){onError(sendChannel,event.error);});
-
-    peerConnection.addEventListener('datachannel', async function (event){
-        receiveChannel=event.channel;
-        receiveChannel.binaryType = 'arraybuffer';
-        receiveChannel.onopen=async function (event) {
-            console.log("receive channel open");
-        };
-        receiveChannel.onclose=async function (event) {
-            console.log("receive channel close");
-        };
-
-        receiveChannel.onmessage=async function(event){
-            receiveMessage(event.data);
-        };
-    });
 }
 
 async function saveFile(fileInfo,fileData){
@@ -356,7 +192,7 @@ async function saveFile(fileInfo,fileData){
     addRow(fileInfo);
 }
 
-async function createPeerConnection(target){
+async function createPeerConnection(target,channel_num){
     let peerConnection= new RTCPeerConnection({
         iceServers: [
             {
@@ -374,19 +210,22 @@ async function createPeerConnection(target){
         peerConnection.addIceCandidate(message.data.ice);
     });
 
-    let dataChannel=peerConnection.createDataChannel("label", {
-        ordered: true
-    });
-    dataChannel.binaryType = 'arraybuffer';
 
 
-    return [peerConnection,dataChannel];
+    let dataChannels=new Array(num_work);
+
+    for(let i=0;i<10;i++){
+        dataChannels[i]=peerConnection.createDataChannel("dataChannel"+i);
+        dataChannels[i].binaryType="arraybuffer";
+    }
+
+    return [peerConnection,dataChannels];
 }
 
 async function requestConnection(target){
-    let obj=await createPeerConnection(target);
+    let obj=await createPeerConnection(target,num_work);
     let peerConnection=obj[0];
-    let dataChannel=obj[1];
+    let dataChannels=obj[1];
 
     let localOffer = await peerConnection.createOffer();
     console.log(`create offer:\n${localOffer.sdp} `);
@@ -397,63 +236,18 @@ async function requestConnection(target){
         console.log(`receive answer:\n${message.data.offer.sdp} `);
         peerConnection.setRemoteDescription(message.data.offer);
     });
-    return [peerConnection,dataChannel];
+    return [peerConnection,dataChannels];
 }
 
 async function listenConnection(target,remoteOffer){
     console.log(`receive offer:\n${remoteOffer.sdp} `);
-    let obj=await createPeerConnection(target);
+    let obj=await createPeerConnection(target,0);
     let peerConnection=obj[0];
-    let dataChannel=obj[1];
 
     await peerConnection.setRemoteDescription(remoteOffer);
     await peerConnection.setLocalDescription(await peerConnection.createAnswer());
     console.log(`my answer:\n${peerConnection.localDescription.sdp} `);
 
     socket.emit("sendTo",{target:target,head:"replyOffer:"+my_sid,data:{offer:peerConnection.localDescription}});
-    return [peerConnection,dataChannel];
-}
-
-
-function onSendChannelStateChange(sendChannel) {
-      if (sendChannel) {
-        const {readyState} = sendChannel;
-        console.log(`Send channel state is: ${readyState}`);
-        if (readyState === 'open') {
-            console.log("success!!!!!!!!!!!!!!!!!");
-            sendChannel.send("Test123456");
-            sendChannel.send("Test78910");
-        }
-      }
-    }
-
-
-function onError(sendChannel,error) {
-      if (sendChannel) {
-        console.error('Error in sendChannel:', error);
-        return;
-      }
-      console.log('Error in sendChannel which is already closed:', error);
-}
-
-function receiveChannelCallback(event) {
-      let receiveChannel = event.channel;
-      receiveChannel.binaryType = 'arraybuffer';
-      receiveChannel.onmessage = onReceiveMessageCallback;
-      receiveChannel.onopen = function(){onReceiveChannelStateChange(receiveChannel);};
-      receiveChannel.onclose = function(){onReceiveChannelStateChange(receiveChannel);};
-}
-
-function onReceiveMessageCallback(event) {
-      console.log(`Receive message: ${event.data}`);
-}
-
-async function onReceiveChannelStateChange(receiveChannel) {
-      if (receiveChannel) {
-        const readyState = receiveChannel.readyState;
-        console.log(`Receive channel state is: ${readyState}`);
-        if (readyState === 'open') {
-            console.log(`succeed!!!!!!!!!!!!!!`);
-        }
-      }
+    return peerConnection;
 }
