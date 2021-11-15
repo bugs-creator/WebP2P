@@ -106,28 +106,12 @@ socket.on("requestOffer",async function (message){
         }
     };
 
-    // const readSlice = index => {
-    //     console.log('readSlice ', index);
-    //     const slice = file.slice(index*chunk_size, (index +1)* chunk_size);
-    //     let buffer=readFileAsync(slice);
-    //     fileReader.readAsArrayBuffer(slice);
-    // };
 
     const getSlice = index => {
         console.log('getSlice ', index);
         return file.slice(index*chunk_size, (index +1)* chunk_size);
     };
 
-    // fileReader.addEventListener('error', error => console.error('Error reading file:', error));
-    // fileReader.addEventListener('abort', event => console.log('File reading aborted:', event));
-    // fileReader.addEventListener('load', e => {
-    //     console.log('FileRead.onload ', e);
-    //     sendMessage("testMessage");
-    //     sendMessage(e.target.result);
-    //     if ((index)*chunk_size <= file.size) {
-    //         readSlice(index);
-    //     }
-    // });
 
     peerConnection.addEventListener('datachannel', function (event) {
             let receiveChannel = event.channel;
@@ -145,21 +129,6 @@ socket.on("requestOffer",async function (message){
                             break;
                         }
                     }
-                    // fileReader.addEventListener('error', error => console.error('Error reading file:', error));
-                    // fileReader.addEventListener('abort', event => console.log('File reading aborted:', event));
-                    // fileReader.addEventListener('load', e => {
-                    //     index++;
-                    //     console.log('FileRead.onload ', e);
-                    //     sendMessage("testMessage");
-                    //     sendMessage(e.target.result);
-                    //     if ((index)*chunk_size <= file.size) {
-                    //         readSlice(index);
-                    //     }
-                    // });
-                    //
-                    // let index=0;
-                    //
-                    // readSlice(0);
                 }
                 if(data.head==="requestSlice"){
                     let slice=await readFileAsync(getSlice(data.content.index));
@@ -185,25 +154,42 @@ async function getFile(target, fileInfo){
     let obj=await requestConnection(target);
     let peerConnection=obj[0];
     let sendChannel=obj[1];
-    let fileData=[];
     let sendQueue=[];
-    let receiveQueue=[];
     let chunk_num=Math.ceil(fileInfo.size/chunk_size);
+    let download_chunk_num=0;
     let tempData={index:null,data:null};
     let receiveChannel;
-
     let num_workers=3;
     let work_cache=[[],[],[]];
-    let work_state=[{done:false,last:new Date().getMilliseconds()},{done:false,last:new Date().getMilliseconds()},{done:false,last:new Date().getMilliseconds()}];
+    let work_state=[{done:false,last:new Date().getTime()},{done:false,last:new Date().getTime()},{done:false,last:new Date().getTime()}];
 
 
-    // for(let i=0;i<num_workers;i++){
-    //     work_state[i].done=false;
-    //     work_state[i].last=new Date().getMilliseconds();
-    // }
 
-    console.log("chunk num: ",chunk_num);
-    console.log(work_cache);
+    let table=document.getElementById("downloadListTable");
+    let tr=document.createElement("tr");
+    let td1=document.createElement("td");
+    td1.innerText=fileInfo.id;
+
+    let td2=document.createElement("td");
+    td2.innerText=fileInfo.name;
+
+    let td3=document.createElement("td");
+    let progress=document.createElement("progress");
+    progress.max=chunk_num;
+    progress.value=0;
+    let text=document.createElement("label");
+
+    td3.appendChild(progress);
+    td3.appendChild(text);
+
+    let td4=document.createElement("td");
+
+
+    tr.appendChild(td1);
+    tr.appendChild(td2);
+    tr.appendChild(td3);
+    tr.appendChild(td4);
+    table.appendChild(tr);
 
     sendChannel.binaryType = 'arraybuffer';
 
@@ -212,15 +198,14 @@ async function getFile(target, fileInfo){
         while(sendChannel.readyState==='open' && sendQueue.length!==0){
             let data=sendQueue.shift();
             sendChannel.send(data[0]);
-            console.log('send1 ', data[0]);
         }
     });
 
     const sendMessage=message=>{
+        console.log("send:\n",message);
         sendQueue.push([message]);
         while(sendChannel.readyState==='open' && sendQueue.length!==0){
             let data=sendQueue.shift()[0];
-            console.log('send1 ', data);
             sendChannel.send(data);
         }
     };
@@ -229,7 +214,7 @@ async function getFile(target, fileInfo){
     const requestSlice=pos=>{
         let work=work_cache[pos];
         if(work.length*3+pos<=chunk_num-1) {
-            work_state[pos].last=new Date().getMilliseconds();
+            work_state[pos].last=new Date().getTime();
             sendMessage(JSON.stringify({head: "requestSlice", content: {index: work.length * 3 + pos}}));
         }else{
             work_state[pos].done=true;
@@ -243,27 +228,40 @@ async function getFile(target, fileInfo){
         let work=work_cache[pos];
         if(work.length-1<sub_index) {
             work.push(buffer);
+            download_chunk_num++;
+            progress.value=download_chunk_num;
             requestSlice(pos);
         }
     };
 
 
-
-
     sendMessage(JSON.stringify({head:"requestFile",content:{fileId:fileInfo.id}}));
 
 
+    let last_num=0;
+    let last_time=0;
+
     async function start(){
         let flag=false;
+        console.log("start transmission");
         while(!flag){
             flag=true;
             for(let i=0;i<num_workers;i++){
-                if(!work_state[i].done&&(new Date().getMilliseconds()-work_state[i].last)>500){
+                console.log(work_state[i].done);
+                if((!work_state[i].done)&&((new Date().getTime()-work_state[i].last)>500)){
                     requestSlice(i);
+                    console.log("packet loss");
                 }
                 flag=flag&&work_state[i].done;
             }
-            await sleep(100);
+            let time_pass=new Date().getTime()-last_time;
+            if(time_pass>1000){
+                last_time=new Date().getTime();
+                let number=chunk_size*(download_chunk_num-last_num);
+                last_num=download_chunk_num;
+                text.innerText=(1000*number/time_pass/1024/1024).toFixed(2)+"Mb/s";
+            }
+            await sleep(200);
         }
         let data=[];
         for(let i=0;i<work_cache[0].length;i++){
@@ -274,6 +272,7 @@ async function getFile(target, fileInfo){
             }
         }
         saveFile(fileInfo,data);
+        tr.remove();
         peerConnection.close();
     }
 
@@ -285,12 +284,12 @@ async function getFile(target, fileInfo){
         }else if(message.byteLength!==undefined){
             if(tempData.index!==null){
                 tempData.data=message;
-                // receiveQueue.push({index:tempData.index,data:tempData.data});
                 awakeWorker(tempData.index,tempData.data);
                 tempData.index=null;
                 tempData.data=null;
             }
         }else{
+            console.log("error");
             tempData.index=null;
             tempData.data=null;
         }
@@ -310,16 +309,7 @@ async function getFile(target, fileInfo){
         };
 
         receiveChannel.onmessage=async function(event){
-            // console.log(`receive data:\n${event.data} `);
-            // console.log(`receive data:\n${event.data.byteLength} `);
-            // fileData.push(event.data);
-            // size+=event.data.byteLength;
-            // console.log(`accept size:\n${size}/ ${fileInfo.size} `);
-            // if(size===fileInfo.size){
-            //     saveFile(fileInfo,fileData);
-            // }
             receiveMessage(event.data);
-            console.log(receiveQueue);
         };
     });
 }
