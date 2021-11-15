@@ -4,7 +4,7 @@
 var files=[];
 var socket=io();
 var my_sid=null;
-var chunk_size=4096;
+var chunk_size=32768;
 var temp_count=0;
 var table=document.getElementById("fileListTable");
 
@@ -86,23 +86,45 @@ socket.on("requestOffer",async function (message){
     let sendChannel=obj[1];
     let sendQueue=[];
     let file=null;
-    // let fileReader=new FileReader();
+    let canSend=true;
 
-    sendChannel.addEventListener('open',function (event) {
+    sendChannel.addEventListener('open',async function (event) {
         console.log('open ');
         while(sendChannel.readyState==='open' && sendQueue.length!==0){
-            let data=sendQueue.shift();
-            sendChannel.send(data[0]);
-            console.log('send ', data[0]);
+            console.log("bufferAmount: ",sendChannel.bufferedAmount);
+            console.log("bufferAmountLow: ",sendChannel.bufferedAmountLowThreshold);
+            if(sendChannel.bufferedAmount<=1048576) {
+                let data = sendQueue.shift();
+                sendChannel.send(data[0]);
+                console.log('send ', data[0]);
+            }else{
+
+                await sleep(10);
+            }
         }
     });
 
-    const sendMessage=message=>{
+    sendChannel.onbufferedamountlow=function (event) {
+        // console.log("buffer low!!!!!!!!!");
+        canSend=false;
+    };
+
+    sendChannel.onerror=function (event) {
+        console.log("send error!!!!!!!!");
+    };
+
+    const sendMessage=async (message)=>{
         sendQueue.push([message]);
         while(sendChannel.readyState==='open' && sendQueue.length!==0){
-            let data=sendQueue.shift()[0];
-            sendChannel.send(data);
-            console.log('send ', data);
+                            console.log("bufferAmount: ",sendChannel.bufferedAmount);
+                console.log("bufferAmountLow: ",sendChannel.bufferedAmountLowThreshold);
+            if(sendChannel.bufferedAmount<=1048576) {
+                let data = sendQueue.shift();
+                sendChannel.send(data[0]);
+                console.log('send ', data[0]);
+            }else{
+                await sleep(10);
+            }
         }
     };
 
@@ -159,11 +181,14 @@ async function getFile(target, fileInfo){
     let download_chunk_num=0;
     let tempData={index:null,data:null};
     let receiveChannel;
-    let num_workers=3;
-    let work_cache=[[],[],[]];
-    let work_state=[{done:false,last:new Date().getTime()},{done:false,last:new Date().getTime()},{done:false,last:new Date().getTime()}];
+    let num_workers=100;
+    let work_cache=new Array(num_workers);
+    let work_state=new Array(num_workers);
 
-
+    for(let i=0;i<num_workers;i++){
+        work_cache[i]=[];
+        work_state[i]={done:false,last:new Date().getTime()};
+    }
 
     let table=document.getElementById("downloadListTable");
     let tr=document.createElement("tr");
@@ -213,9 +238,9 @@ async function getFile(target, fileInfo){
 
     const requestSlice=pos=>{
         let work=work_cache[pos];
-        if(work.length*3+pos<=chunk_num-1) {
+        if(work.length*num_workers+pos<=chunk_num-1) {
             work_state[pos].last=new Date().getTime();
-            sendMessage(JSON.stringify({head: "requestSlice", content: {index: work.length * 3 + pos}}));
+            sendMessage(JSON.stringify({head: "requestSlice", content: {index: work.length * num_workers + pos}}));
         }else{
             work_state[pos].done=true;
             console.log("work ",pos, "done!!");
@@ -223,9 +248,11 @@ async function getFile(target, fileInfo){
     };
 
     const awakeWorker=(index,buffer)=>{
+
         let pos=index%num_workers;
         let sub_index=parseInt(index/num_workers);
         let work=work_cache[pos];
+        console.log("awake:",index," worklen:",work.length," subIndex:",sub_index);
         if(work.length-1<sub_index) {
             work.push(buffer);
             download_chunk_num++;
@@ -249,6 +276,7 @@ async function getFile(target, fileInfo){
             for(let i=0;i<num_workers;i++){
                 if((!work_state[i].done)&&((new Date().getTime()-work_state[i].last)>500)){
                     requestSlice(i);
+                    // await sleep(500);
                     console.log("packet loss");
                 }
                 flag=flag&&work_state[i].done;
@@ -260,7 +288,7 @@ async function getFile(target, fileInfo){
                 last_num=download_chunk_num;
                 text.innerText=(1000*number/time_pass/1024/1024).toFixed(2)+"Mb/s";
             }
-            await sleep(200);
+            await sleep(100);
         }
         let data=[];
         for(let i=0;i<work_cache[0].length;i++){
@@ -305,6 +333,9 @@ async function getFile(target, fileInfo){
         receiveChannel.binaryType = 'arraybuffer';
         receiveChannel.onopen=async function (event) {
             console.log("receive channel open");
+        };
+        receiveChannel.onclose=async function (event) {
+            console.log("receive channel close");
         };
 
         receiveChannel.onmessage=async function(event){
