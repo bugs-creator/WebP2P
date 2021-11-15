@@ -202,7 +202,7 @@ async function getFile(target, fileInfo){
     });
 
     const sendMessage=message=>{
-        console.log("send:\n",message);
+        // console.log("send:\n",message);
         sendQueue.push([message]);
         while(sendChannel.readyState==='open' && sendQueue.length!==0){
             let data=sendQueue.shift()[0];
@@ -247,7 +247,6 @@ async function getFile(target, fileInfo){
         while(!flag){
             flag=true;
             for(let i=0;i<num_workers;i++){
-                console.log(work_state[i].done);
                 if((!work_state[i].done)&&((new Date().getTime()-work_state[i].last)>500)){
                     requestSlice(i);
                     console.log("packet loss");
