@@ -39,7 +39,8 @@ def request_file(message):
         for i in res.peer:
             lst+=[i.id]
         emit(message["id"],{'peer':lst,'fileInfo':{'id':res.id,'name':res.name,'size':res.size}})
-    emit(message["id"],{})
+    else:
+        emit(message["id"],{})
 
 
 
