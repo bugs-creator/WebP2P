@@ -89,7 +89,10 @@ def addFile(message):
 @socketio.event
 def removeFile(message):
     peer = Peer.query.get(request.sid)
-    peer.res.remove(Res.query.get(message["id"]))
+    res=Res.query.get(message["id"])
+    peer.res.remove(res)
+    if res.peer.__len__() == 0:
+        db.session.delete(res)
     db.session.add(peer)
     db.session.commit()
 
