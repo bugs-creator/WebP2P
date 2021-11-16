@@ -14,6 +14,7 @@ var bufferAmountMax=16384;
 socket.on("join",function (message){
     console.log(message);
     my_sid=message.sid;
+    document.getElementById("connect_state").innerText="Connection successful! My sid is ";
     document.getElementById("my_sid").innerText=my_sid;
 });
 
@@ -41,6 +42,7 @@ async function addReceivedFile(file){
 
 function addRow(file){
     table=document.getElementById("fileListTable");
+    document.getElementById("fileTablePlaceHolder").style.display="none";
     let tr=document.createElement("tr");
     {
         let td = document.createElement("td");
@@ -64,6 +66,10 @@ function addRow(file){
         }catch (e) {
             td.innerText="null";
         }
+        tr.appendChild(td);
+    }
+        {
+        let td = document.createElement("td");
         tr.appendChild(td);
     }
     table.appendChild(tr);
@@ -146,10 +152,14 @@ socket.on("requestOffer",async function (message){
 async function postFile(id){
     socket.emit("request_file",{id:id});
     socket.on(id,function (message) {
-        let targets=message.peer;
-        let fileInfo=message.fileInfo;
-        console.log(`get file info:\n${JSON.stringify(message)} `);
-        getFile(targets,fileInfo);
+        if(message.peer!==undefined) {
+            let targets = message.peer;
+            let fileInfo = message.fileInfo;
+            console.log(`get file info:\n${JSON.stringify(message)} `);
+            getFile(targets, fileInfo);
+        }else{
+            window.alert("No such file!");
+        }
     });
 }
 
@@ -157,6 +167,8 @@ async function getFile(targets, fileInfo){
 
 
     let dataChannels=[];
+    let num_peer=targets.length;
+
     for(let i=0;i<targets.length;i++){
         let channels=await requestDataChannel(targets[i]);
         for(let j=0;j<channels.length;j++){
@@ -214,6 +226,7 @@ async function getFile(targets, fileInfo){
     tr.appendChild(td5);
     tr.appendChild(td6);
     table.appendChild(tr);
+    document.getElementById("downloadTablePlaceHolder").style.display="none";
 
 
     for(let i=0;i<chunk_num;i++){
@@ -312,7 +325,7 @@ async function getFile(targets, fileInfo){
             let number=current_num-last_number;
             let time_pass=new Date().getTime()-last_time;
             text.innerText=(1000*number*chunk_size/time_pass/1024/1024).toFixed(2)+"Mb/s";
-            td5.innerText="current download channels: "+num_channel;
+            td5.innerText=num_channel+" channels from "+num_peer+" peers";
             last_time=new Date().getTime();
             last_number=current_num;
             await sleep(1000);
@@ -323,56 +336,13 @@ async function getFile(targets, fileInfo){
         }
         saveFile(fileInfo,data);
         tr.remove();
+        if(document.getElementById("downloadListTable").childElementCount===1) {
+            document.getElementById("downloadTablePlaceHolder").style.display="table-row";
+        }
     };
 
     update();
 
-    // let has_saved=false;
-    // for(let i=0;i<dataChannels.length;i++){
-    //     const dataChannel=dataChannels[i];
-    //
-    //     dataChannel.addEventListener('open', function (event) {
-    //         if(dataChannel.readyState==="open"){
-    //             console.log("dataChannel ",i," is open");
-    //             if(!has_request_file){
-    //                 dataChannel.send(JSON.stringify({head:"requestFile",content:{fileId:fileInfo.id}}));
-    //                 has_request_file=true;
-    //             }
-    //             dataChannel.send(JSON.stringify({head: "requestSlice", content: {index: i }}));
-    //
-    //         }
-    //     });
-    //     dataChannel.addEventListener('close', function (event) {
-    //         console.log("dataChannel ",i," is close");
-    //     });
-    //     dataChannel.addEventListener('error', function (error) {
-    //         console.log("dataChannel ",i," error");
-    //     });
-    //     dataChannel.onmessage=async function(event){
-    //         console.log("receive: ",event.data.byteLength);
-    //         if(event.data.byteLength!==0) {
-    //             work_cache[i].push(event.data);
-    //             current_num++;
-    //             progress.value=current_num;
-    //             dataChannel.send(JSON.stringify({head: "requestSlice", content: {index: i+work_cache[i].length*num_workers}}));
-    //         }else{
-    //             work_state[i]=true;
-    //             if(current_num===chunk_num&&!has_saved){
-    //                 has_saved=true;
-    //                 let data=[];
-    //                 for(let i=0;i<work_cache[0].length;i++){
-    //                     for(let j=0;j<num_workers;j++) {
-    //                         if(work_cache[j].length-1>=i) {
-    //                             data.push(work_cache[j][i]);
-    //                         }
-    //                     }
-    //                 }
-    //                 tr.remove();
-    //                 saveFile(fileInfo,data);
-    //             }
-    //         }
-    //     };
-    // }
 }
 
 async function saveFile(fileInfo,fileData){

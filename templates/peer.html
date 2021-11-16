@@ -2,9 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
-{#    <script src="{{ url_for('static',filename='script/jquery.min.js') }}" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>#}
-{#    <script src="{{ url_for('static',filename='script/socket.io.js') }}" integrity="sha512-aMGMvNYu8Ue4G+fHa359jcPb1u+ytAF+P2SCb+PxrjCdO3n3ZTxJ30zuH39rimUggmTwmh2u7wvQsDTHESnmfQ==" crossorigin="anonymous"></script>#}
+    <title>WebP2P</title>
     <script src="{{ url_for('static',filename='script/jquery.min.js') }}"></script>
     <script src="{{ url_for('static',filename='script/socket.io.js') }}"></script>
     <script src="{{ url_for('static',filename='script/peer_new.js') }}"></script>
@@ -17,55 +15,80 @@
             });
         })
     </script>
+    <link rel="stylesheet" href="{{ url_for('static',filename='style/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static',filename='style/peer.css') }}">
-
 </head>
-<p id="my_sid">my sid</p>
-<form id="test_connect" method="POST" action="#">
-    <label>
-        <input type="text" id="target">
-    </label>
-    <input type="submit">
-</form>
-<div>
-    <form>
-        <input id="fileChooser" type="file" multiple="multiple" onchange="addFile()">
-    </form>
-</div>
-<div id="downloadList">
-    <table class="pure-table">
-        <thead>
-            <tr>
-                <th>id</th>
-                <th>name</th>
-                <th>progress</th>
-                <th>size</th>
-                <th>info</th>
-                <th>option</th>
-            </tr>
-        </thead>
-        <tbody id="downloadListTable">
-
-        </tbody>
-    </table>
-</div>
-<div id="fileList">
-    <table class="pure-table">
-        <thead>
-            <tr>
-                <th>id</th>
-                <th>name</th>
-                <th>size</th>
-                <th>url</th>
-                <th>delete</th>
-            </tr>
-        </thead>
-        <tbody id="fileListTable" >
-
-        </tbody>
-    </table>
-</div>
 <body>
+<div id="container">
+    <h1><a href="#" >WebP2P File System</a> <span>Share your file</span></h1>
+    <section>
 
+        <p>This page is a WebRTC based P2P file system, it allows you to share files peer-to-peer with others.</p>
+
+        <p>Select your file, and you will see the id generated for it by the server in the table below. Share it and your friends can download your file. <b>Note: </b>Any attempt to refresh the page will result in a lost connection and the server will delete your previous data. You need to keep this page alive during the connection.</p>
+
+        <p>This system adopts multi-channel design to maximize transmission speed at the application layer. However, due to the architectural design of the browser, it may still be a little slow compared to the application.</p>
+
+        <p>When you download a file, you also become a sharing node and others can access the file through you. If multiple nodes have the file, the web page will attempt to start downloading on multiple nodes at the same time. This will greatly increase transmission speed.</p>
+
+        <p>If you and your friends are on the same LAN, the download will not generate any network traffic.</p>
+    </section>
+    <section>
+        <p  style="display: inline"><b id="connect_state">connecting to server...</b></p>
+        <label id="my_sid" style="display: inline;width: fit-content;color: #444444"  ></label>
+    </section>
+    <section>
+        <form id="test_connect" method="POST" action="#" style="display: inline">
+            <label for="target">Request file: </label><input type="text" id="target" style="margin-right: 1em;margin-left: 1em">
+
+            <input type="submit" value="request" class=input_out onmousemove="this.className='input_move'" onmouseout="this.className='input_out'">
+        </form>
+        <div id="downloadList">
+        <table class="pure-table">
+            <thead>
+                <tr style="table-layout: fixed">
+                    <th style="width: 12%">id</th>
+                    <th style="width: 28%">name</th>
+                    <th style="width: 22%">progress</th>
+                    <th style="width: 13%">size</th>
+                    <th style="width: 15%">state</th>
+                    <th style="width: 10%">option</th>
+                </tr>
+            </thead>
+            <tbody id="downloadListTable">
+            <tr id="downloadTablePlaceHolder"><td colspan="6"><div>empty</div></td></tr>
+            </tbody>
+        </table>
+    </div>
+    </section>
+    <section>
+        <div>
+            <form>
+                <label>Share your file: </label><input id="fileChooser" type="file" multiple="multiple" onchange="addFile()" style="margin-right: 1em;margin-left: 1em">
+            </form>
+        </div>
+
+    <div id="fileList">
+        <table class="pure-table" style="table-layout: fixed">
+            <thead>
+                <tr>
+                    <th style="width: 10%">id</th>
+                    <th style="width: 40%">name</th>
+                    <th style="width: 20%">size</th>
+                    <th style="width: 20%">url</th>
+                    <th style="width: 10%">option</th>
+                </tr>
+            </thead>
+            <tbody id="fileListTable" >
+            <tr id="fileTablePlaceHolder"><td colspan="5"><div>empty</div></td></tr>
+            </tbody>
+        </table>
+    </div>
+    </section>
+
+
+
+
+</div>
 </body>
 </html>
