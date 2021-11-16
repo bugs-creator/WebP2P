@@ -87,6 +87,14 @@ def addFile(message):
     emit(str(message["messageId"]), {"id": str(id)})
 
 @socketio.event
+def removeFile(message):
+    peer = Peer.query.get(request.sid)
+    peer.res.remove(Res.query.get(message["id"]))
+    db.session.add(peer)
+    db.session.commit()
+
+
+@socketio.event
 def addReceivedFile(message):
     print(message)
     res = Res.query.get(message["id"])

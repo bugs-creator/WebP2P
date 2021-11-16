@@ -33,6 +33,10 @@ async function addFile(){
     }
 }
 
+async function removeFile(id){
+
+}
+
 async function addReceivedFile(file){
         await socket.emit("addReceivedFile",{messageId:message_id,id:file.id,name:file.name,size:file.size});
         files.push(file);
@@ -43,6 +47,8 @@ async function addReceivedFile(file){
 function addRow(file){
     table=document.getElementById("fileListTable");
     document.getElementById("fileTablePlaceHolder").style.display="none";
+    const id=file.id;
+
     let tr=document.createElement("tr");
     {
         let td = document.createElement("td");
@@ -68,8 +74,24 @@ function addRow(file){
         }
         tr.appendChild(td);
     }
-        {
+    {
         let td = document.createElement("td");
+        let a=document.createElement("a");
+        a.innerText="delete";
+        a.onclick=function (event) {
+            tr.remove();
+            if(table.childElementCount===1){
+                document.getElementById("fileTablePlaceHolder").style.display="table-row";
+            }
+            socket.emit("removeFile",{id:id});
+            for(let i=0;i<files.length;i++){
+                if(files[i].id===id){
+                    files.splice(i,1);
+                    break;
+                }
+            }
+        };
+        td.appendChild(a);
         tr.appendChild(td);
     }
     table.appendChild(tr);
@@ -150,6 +172,12 @@ socket.on("requestOffer",async function (message){
 
 
 async function postFile(id){
+    for(let i=0;i<files.length;i++){
+        if(id===files[i].id){
+            window.alert("You already have the resource.");
+            return;
+        }
+    }
     socket.emit("request_file",{id:id});
     socket.on(id,function (message) {
         if(message.peer!==undefined) {
@@ -165,7 +193,6 @@ async function postFile(id){
 
 async function getFile(targets, fileInfo){
 
-
     let dataChannels=[];
     let num_peer=targets.length;
 
@@ -175,7 +202,6 @@ async function getFile(targets, fileInfo){
             dataChannels.push(channels[j]);
         }
     }
-
 
     let chunk_num=Math.ceil(fileInfo.size/chunk_size);
     let current_num=0;
@@ -402,6 +428,7 @@ async function requestDataChannel(target){
     let localOffer = await peerConnection.createOffer();
     console.log(`create offer:\n${localOffer.sdp} `);
     await peerConnection.setLocalDescription(localOffer);
+
 
     socket.emit("sendTo",{target:target,head:"requestOffer",data:{offer:localOffer}});
     socket.on("replyOffer:"+target,function (message){
