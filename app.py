@@ -1,7 +1,7 @@
 import uuid
 from threading import Lock
 from flask import Flask, render_template, session, request, \
-    copy_current_request_context
+    copy_current_request_context, url_for, redirect
 from flask_socketio import SocketIO, emit, join_room, leave_room, \
     close_room, rooms, disconnect
 from flask_sqlalchemy import SQLAlchemy
@@ -27,9 +27,6 @@ thread = None
 thread_lock = Lock()
 
 
-def sendToOneUser(target, msgString):
-    pass
-
 
 @socketio.event
 def request_file(message):
@@ -54,9 +51,6 @@ def background_thread():
                       {'data': 'Server generated event', 'count': count})
 
 
-@app.route("/test")
-def test():
-    return render_template('test.html', async_mode=socketio.async_mode)
 
 
 @app.route("/")
@@ -64,9 +58,9 @@ def peer():
     return render_template('peer.html', async_mode=socketio.async_mode)
 
 
-@app.route('/index')
-def index():
-    return render_template('index.html', async_mode=socketio.async_mode)
+@app.route('/<file_id>')
+def peerWithStartDownload(file_id):
+    return render_template('peer.html', async_mode=socketio.async_mode,default_input=file_id)
 
 
 @socketio.event
