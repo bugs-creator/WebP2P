@@ -316,7 +316,7 @@ async function getFile(targets, fileInfo){
 
 
 
-    let last_time=new Date().getTime();
+    let last_time=0;
     let last_number=0;
 
 
@@ -328,7 +328,7 @@ async function getFile(targets, fileInfo){
             td5.innerText=num_channel+" channels from "+num_peer+" peers";
             last_time=new Date().getTime();
             last_number=current_num;
-            await sleep(1000);
+            await sleep(800);
         }
         let data=[];
         for(let i=0;i<chunk_num;i++){
