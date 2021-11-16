@@ -34,7 +34,10 @@ def sendToOneUser(target, msgString):
 @socketio.event
 def request_file(message):
     res = Res.query.get(message["id"])
-    emit(message["id"],{'peer':res.peer[0].id,'fileInfo':{'id':res.id,'name':res.name,'size':res.size}})
+    lst=[]
+    for i in res.peer:
+        lst+=[i.id]
+    emit(message["id"],{'peer':lst,'fileInfo':{'id':res.id,'name':res.name,'size':res.size}})
 
 
 def background_thread():
@@ -75,7 +78,15 @@ def addFile(message):
     res.peer += [Peer.query.get(request.sid)]
     db.session.add(res)
     db.session.commit()
-    emit(str(message["count"]), {"id": str(id)})
+    emit(str(message["messageId"]), {"id": str(id)})
+
+@socketio.event
+def addReceivedFile(message):
+    print(message)
+    res = Res.query.get(message["id"])
+    res.peer += [Peer.query.get(request.sid)]
+    db.session.add(res)
+    db.session.commit()
 
 
 @socketio.event

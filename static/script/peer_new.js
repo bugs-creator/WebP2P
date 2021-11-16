@@ -5,7 +5,7 @@ var files=[];
 var socket=io();
 var my_sid=null;
 var chunk_size=16384;
-var temp_count=0;
+var message_id=0;
 var table=document.getElementById("fileListTable");
 var num_work=100;
 var bufferAmountMax=16384;
@@ -22,14 +22,21 @@ socket.on("join",function (message){
 async function addFile(){
     for (let i = 0, l = document.getElementById("fileChooser").files.length; i < l; i++) {
         let file=document.getElementById("fileChooser").files[i];
-        await socket.emit("addFile",{count:temp_count,name:file.name,size:file.size});
-        socket.on(""+temp_count,function (message){
+        await socket.emit("addFile",{messageId:message_id,name:file.name,size:file.size});
+        socket.on(""+message_id,function (message){
            file.id=message.id;
            files.push(file);
            addRow(file);
         });
-        temp_count++;
+        message_id++;
     }
+}
+
+async function addReceivedFile(file){
+        await socket.emit("addReceivedFile",{messageId:message_id,id:file.id,name:file.name,size:file.size});
+        files.push(file);
+        addRow(file);
+        message_id++;
 }
 
 function addRow(file){
@@ -67,17 +74,21 @@ function sleep (time) {
 }
 
 function readFileAsync(file) {
-  return new Promise((resolve, reject) => {
-    let reader = new FileReader();
+    if(file instanceof File) {
+        return new Promise((resolve, reject) => {
+            let reader = new FileReader();
 
-    reader.onload = () => {
-      resolve(reader.result);
-    };
+            reader.onload = () => {
+                resolve(reader.result);
+            };
 
-    reader.onerror = reject;
+            reader.onerror = reject;
 
-    reader.readAsArrayBuffer(file);
-  });
+            reader.readAsArrayBuffer(file);
+        });
+    }else {
+        return file.arrayBuffer();
+    }
 }
 
 
@@ -88,7 +99,9 @@ socket.on("requestOffer",async function (message){
 
     const getSlice = index => {
         console.log('getSlice ', index);
-        return file.slice(index*chunk_size, (index +1)* chunk_size);
+
+        return file.slice(index * chunk_size, (index + 1) * chunk_size);
+
     };
 
 
@@ -121,9 +134,6 @@ socket.on("requestOffer",async function (message){
             }
             if(data.head==="requestSlice"){
                 let slice=await readFileAsync(getSlice(data.content.index));
-                // while(dataChannel.readyState!=="open" || dataChannel.bufferedAmount>=bufferAmountMax){
-                //     await sleep(10);
-                // }
                 console.log("my answer: ",slice.byteLength);
                 dataChannel.send(slice);
             }
@@ -136,22 +146,32 @@ socket.on("requestOffer",async function (message){
 async function postFile(id){
     socket.emit("request_file",{id:id});
     socket.on(id,function (message) {
-        let target=message.peer;
+        let targets=message.peer;
         let fileInfo=message.fileInfo;
         console.log(`get file info:\n${JSON.stringify(message)} `);
-        getFile(target,fileInfo);
+        getFile(targets,fileInfo);
     });
 }
 
-async function getFile(target, fileInfo){
-    let dataChannels=await requestDataChannel(target);
+async function getFile(targets, fileInfo){
+
+
+    let dataChannels=[];
+    for(let i=0;i<targets.length;i++){
+        let channels=await requestDataChannel(targets[i]);
+        for(let j=0;j<channels.length;j++){
+            dataChannels.push(channels[j]);
+        }
+    }
+
+
     let chunk_num=Math.ceil(fileInfo.size/chunk_size);
     let current_num=0;
     let num_workers=dataChannels.length;
     let work_cache=new Array(num_workers);
     let num_channel=0;
 
-    let received_data={};
+    let received_data=new Array(chunk_num);
     let wait_for_download=[];
 
 
@@ -207,8 +227,8 @@ async function getFile(target, fileInfo){
 
     const deliveryData=(index,data)=>{
         if(data!==null) {
-            if (!(index in received_data)) {
-                received_data.index = data;
+            if (!(received_data[index] instanceof ArrayBuffer)) {
+                received_data[index] = data;
                 current_num++;
                 td4.innerText=+current_num*chunk_size+"/"+fileInfo.size;
                 progress.value=current_num;
@@ -299,7 +319,7 @@ async function getFile(target, fileInfo){
         }
         let data=[];
         for(let i=0;i<chunk_num;i++){
-            data.push(received_data.i);
+            data.push(received_data[i]);
         }
         saveFile(fileInfo,data);
         tr.remove();
@@ -364,7 +384,12 @@ async function saveFile(fileInfo,fileData){
       `download`;
     downloadAnchor.style.display = 'block';
     fileInfo.url=downloadAnchor;
-    addRow(fileInfo);
+    received.id=fileInfo.id;
+    received.name=fileInfo.name;
+    received.url=fileInfo.url;
+
+
+    addReceivedFile(received);
 }
 
 async function createPeerConnection(target,channel_num){
