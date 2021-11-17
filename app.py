@@ -35,7 +35,7 @@ def request_file(message):
         lst=[]
         for i in res.peer:
             lst+=[i.id]
-        emit(message["id"],{'peer':lst,'fileInfo':{'id':res.id,'name':res.name,'size':res.size}})
+        emit(message["id"],{'peer':lst,'fileInfo':{'id':res.id,'name':res.name,'size':res.size,'md5':res.md5}})
     else:
         emit(message["id"],{})
 
@@ -74,7 +74,7 @@ def addFile(message):
     id = str(uuid.uuid1()).split("-")[0]
     while Res.query.get(id) is not None:
         id = str(uuid.uuid1()).split("-")[0]
-    res = models.Res(id=str(id), name=message["name"], size=message["size"])
+    res = models.Res(id=str(id), name=message["name"], size=message["size"],md5=message["md5"])
     res.peer += [Peer.query.get(request.sid)]
     db.session.add(res)
     db.session.commit()

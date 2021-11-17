@@ -5,6 +5,7 @@
     <title>WebP2P</title>
     <script src="{{ url_for('static',filename='script/jquery.min.js') }}"></script>
     <script src="{{ url_for('static',filename='script/socket.io.js') }}"></script>
+    <script src="{{ url_for('static',filename='script/spark-md5.min.js') }}"></script>
     <script src="{{ url_for('static',filename='script/peer.js') }}"></script>
     <script type="text/javascript" charset="utf-8">
         $(document).ready(function (){
@@ -20,7 +21,7 @@
 </head>
 <body>
 <div id="container">
-    <h1><a href="#" >Peeeer! (beta)</a> <span>Share your file p2p</span></h1>
+    <h1><a href="#" >Peeeer! (beta)</a> <span>Share your file P2P</span></h1>
     <section>
         <p>This page is a WebRTC based P2P file system, it allows you to share files peer-to-peer with others.</p>
 
@@ -63,9 +64,15 @@
     </section>
     <section>
         <div>
-            <form>
-                <label>Share your file: </label><input id="fileChooser" type="file" multiple="multiple" onchange="addFile()" style="margin-right: 1em;margin-left: 1em">
+            <form style="display: inline">
+                <label>Share your file: </label><input id="fileChooser" type="file" multiple="multiple" onchange="addFile()" style="margin-right:0;margin-left: 1em;padding-right: 0">
             </form>
+
+            <label style="">verify:
+                <input type="checkbox" id="verify_check">
+            </label>
+            <progress id="verify_progress" style="display: inline" value="0"></progress>
+            <label id="verify_info">nothing verify</label>
         </div>
 
     <div id="fileList">

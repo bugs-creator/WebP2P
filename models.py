@@ -14,6 +14,7 @@ class Res(db.Model):
     id = db.Column(db.String, primary_key=True)
     name = db.Column(db.String)
     size = db.Column(db.Integer)
+    md5=db.Column(db.String)
 
 
 peer2res = db.Table('peer2res',

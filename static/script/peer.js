@@ -4,7 +4,9 @@
 var files=[];
 var socket=io();
 var my_sid=null;
-var chunk_size=16384;
+var chunk_size=32768;
+var num_verify_chunk=32;
+const md5_length=4;
 var message_id=0;
 var table=document.getElementById("fileListTable");
 var num_work=100;
@@ -25,16 +27,66 @@ socket.on("join",function (message){
 
 
 async function addFile(){
+    document.getElementById("fileChooser").setAttribute("disabled","disabled");
     for (let i = 0, l = document.getElementById("fileChooser").files.length; i < l; i++) {
         let file=document.getElementById("fileChooser").files[i];
-        await socket.emit("addFile",{messageId:message_id,name:file.name,size:file.size});
+        let verify_progress=document.getElementById("verify_progress");
+        let verify_info=document.getElementById("verify_info");
+        let verify = null;
+        // if(document.getElementById("verify_check").checked) {
+        //     verify="";
+        //     verify_info.innerText = "start check: " + file.name;
+        //     verify_progress.max = Math.ceil(file.size / chunk_size / num_verify_chunk);
+        //     verify_progress.value = 0;
+        //
+        //     for (let index = 0; index * chunk_size * num_verify_chunk <= file.size; index++) {
+        //         let slice = await readFileAsync(file.slice(index * chunk_size * num_verify_chunk, (index + 1) * chunk_size * num_verify_chunk));
+        //         if (slice.length === 0) {
+        //             break;
+        //         }
+        //         verify_progress.value = index + 1;
+        //         let spark = new SparkMD5.ArrayBuffer();
+        //         spark.append(slice);
+        //         verify += spark.end();
+        //         spark.destroy();
+        //     }
+        //
+        //     verify_info.innerText = "check complete!";
+        //     console.log(verify);
+        // }
+
+        if(document.getElementById("verify_check").checked) {
+
+            verify="";
+            verify_info.innerText = "start verify: " + file.name;
+            verify_progress.max = Math.ceil(file.size / chunk_size );
+            verify_progress.value = 0;
+            for (let index = 0; index * chunk_size <= file.size; index++) {
+                let slice = await readFileAsync(file.slice(index * chunk_size , (index + 1) * chunk_size ));
+                if (slice.length === 0) {
+                    break;
+                }
+                verify_progress.value = index + 1;
+                let spark = new SparkMD5.ArrayBuffer();
+                spark.append(slice);
+                let md5=spark.end().slice(0,md5_length);
+                // console.log(md5);
+                verify += md5;
+                spark.destroy();
+            }
+            verify_info.innerText = "verify complete!";
+        }
+
+        await socket.emit("addFile",{messageId:message_id,name:file.name,size:file.size,md5:verify});
         socket.on(""+message_id,function (message){
            file.id=message.id;
            files.push(file);
            addRow(file);
+           socket.off(""+message_id);
         });
         message_id++;
     }
+    document.getElementById("fileChooser").removeAttribute("disabled");
 }
 
 async function removeFile(id){
@@ -56,7 +108,7 @@ function copyText(text, callback){
     document.getElementById('cp_hgz_input').select();
     document.execCommand('copy');
     document.getElementById('cp_hgz_input').remove();
-    if(callback) {callback(text)}
+    if(callback) {callback(text);}
 }
 
 function addRow(file){
@@ -126,11 +178,9 @@ function readFileAsync(file) {
     if(file instanceof File) {
         return new Promise((resolve, reject) => {
             let reader = new FileReader();
-
             reader.onload = () => {
                 resolve(reader.result);
             };
-
             reader.onerror = reject;
 
             reader.readAsArrayBuffer(file);
@@ -168,7 +218,6 @@ socket.on("requestOffer",async function (message){
 
         dataChannel.onmessage=async function(event){
             let data=JSON.parse(event.data);
-
             last_message=new Date().getTime();
             setTimeout(function () {
                 if(new Date().getTime()-last_message>3000){
@@ -212,6 +261,7 @@ async function postFile(id){
         }else{
             window.alert("No such file!");
         }
+        socket.off(id);
     });
 }
 
@@ -223,6 +273,11 @@ async function getFile(targets, fileInfo){
         for(let j=0;j<channels.length;j++){
             dataChannels.push(channels[j]);
         }
+    }
+
+    let verify=document.getElementById("verify_check").checked;
+    if(fileInfo.md5===null){
+        verify=false;
     }
 
     let chunk_num=Math.ceil(fileInfo.size/chunk_size);
@@ -301,10 +356,25 @@ async function getFile(targets, fileInfo){
     const deliveryData=(index,data)=>{
         if(data!==null) {
             if (!(received_data[index] instanceof ArrayBuffer)) {
-                received_data[index] = data;
-                current_num++;
-                td4.innerText=+(current_num*chunk_size/1024/1024).toFixed(2)+"/"+(fileInfo.size/1024/1024).toFixed(2)+" Mb";
-                progress.value=current_num;
+                if(verify){
+                     let spark = new SparkMD5.ArrayBuffer();
+                     spark.append(data);
+                     if(spark.end().slice(0,md5_length)===fileInfo.md5.slice(index*md5_length,(index+1)*md5_length)){
+                         // console.log("verify success");
+                         received_data[index] = data;
+                         current_num++;
+                         td4.innerText=+(current_num*chunk_size/1024/1024).toFixed(2)+"/"+(fileInfo.size/1024/1024).toFixed(2)+" Mb";
+                         progress.value=current_num;
+                     }else{
+                         console.log("verify fail");
+                     }
+                     spark.destroy();
+                }else{
+                    received_data[index] = data;
+                    current_num++;
+                    td4.innerText=+(current_num*chunk_size/1024/1024).toFixed(2)+"/"+(fileInfo.size/1024/1024).toFixed(2)+" Mb";
+                    progress.value=current_num;
+                }
             }
         }else{
             wait_for_download.push(index);
@@ -341,7 +411,7 @@ async function getFile(targets, fileInfo){
                             deliveryData(_index,null);
                             dataChannel.close();
                         }
-                    },500);
+                    },1000);
                 }
             }
         });

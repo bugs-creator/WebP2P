@@ -32,6 +32,11 @@ audio {
   max-width: 100%;
 }
 
+input[type=checkbox]{
+    display: inline-block;
+    vertical-align: middle;
+}
+
 input[type="text"]{
   border: 1px solid #ccc;
   border-radius: 4px;
