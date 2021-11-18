@@ -145,7 +145,7 @@ function addRow(file){
     {
         let td = document.createElement("td");
         let a=document.createElement("a");
-        a.innerText="delete";
+        a.innerText="delete\n";
         a.onclick=function (event) {
             tr.remove();
             if(table.childElementCount===1){
@@ -268,10 +268,64 @@ async function postFile(id){
 async function getFile(targets, fileInfo){
     let dataChannels=[];
     let num_peer=targets.length;
+
+
+    const establishChannel=channel=>{
+        const dataChannel=channel;
+        let has_request_file=false;
+        let cache={index:null,data:null};
+        dataChannel.addEventListener('open', function (event) {
+            if(dataChannel.readyState==="open"){
+                num_channel++;
+                console.log(num_channel," channels are open");
+                if(!has_request_file){
+                    dataChannel.send(JSON.stringify({head:"requestFile",content:{fileId:fileInfo.id}}));
+                    has_request_file=true;
+                }
+
+                cache.index=getDownloadIndex();
+                if(cache.index!==null) {
+                    let _index=cache.index;
+                    dataChannel.send(JSON.stringify({head: "requestSlice", content: {index: cache.index}}));
+                    setTimeout(function () {
+                        if(cache.index===_index){
+                            deliveryData(_index,null);
+                            dataChannel.close();
+                        }
+                    },1000);
+                }
+            }
+        });
+        dataChannel.addEventListener('close', function (event) {
+            num_channel--;
+            console.log("channel close");
+            deliveryData(cache.index,cache.data);
+        });
+        dataChannel.addEventListener('error', function (error) {
+            console.log("dataChannel error");
+            deliveryData(cache.index,cache.data);
+        });
+        dataChannel.onmessage=async function(event){
+            deliveryData(cache.index,event.data);
+            cache.index=getDownloadIndex();
+            if(cache.index!==null) {
+                let _index=cache.index;
+                dataChannel.send(JSON.stringify({head: "requestSlice", content: {index: cache.index}}));
+                setTimeout(function () {
+                    if(cache.index===_index){
+                        deliveryData(_index,null);
+                        dataChannel.close();
+                    }},500);
+            }
+        };
+    };
+
+
     for(let i=0;i<targets.length;i++){
         let channels=await requestDataChannel(targets[i]);
         for(let j=0;j<channels.length;j++){
             dataChannels.push(channels[j]);
+            establishChannel(channels[j]);
         }
     }
 
@@ -332,6 +386,39 @@ async function getFile(targets, fileInfo){
             document.getElementById("downloadTablePlaceHolder").style.display="table-row";
         }
     };
+    let refresh=document.createElement("a");
+
+    refresh.innerText="refresh\n";
+    refresh.onclick=async function (event) {
+        for(let i=0;i<dataChannels.length;i++){
+            dataChannels[i].close();
+        }
+
+        socket.emit("request_file",{id:fileInfo.id});
+        socket.on(fileInfo.id,async function (message) {
+            if(message.peer!==undefined) {
+                let targets = message.peer;
+                num_peer=targets.length;
+                console.log(`get file info:\n${JSON.stringify(message)} `);
+                dataChannels=[];
+                for(let i=0;i<targets.length;i++){
+                    let channels=await requestDataChannel(targets[i]);
+                    for(let j=0;j<channels.length;j++){
+                        dataChannels.push(channels[j]);
+                        establishChannel(channels[j]);
+                    }
+                }
+
+            }else{
+                window.alert("No such file!");
+            }
+            socket.off(fileInfo.id);
+        });
+
+
+
+    };
+    td6.appendChild(refresh);
     td6.appendChild(abort);
 
     tr.appendChild(td1);
@@ -377,7 +464,9 @@ async function getFile(targets, fileInfo){
                 }
             }
         }else{
-            wait_for_download.push(index);
+            if(index!==null) {
+                wait_for_download.push(index);
+            }
         }
     };
 
@@ -389,57 +478,11 @@ async function getFile(targets, fileInfo){
     };
 
 
-    const establishChannel=channel=>{
-        const dataChannel=channel;
-        let has_request_file=false;
-        let cache={index:null,data:null};
-        dataChannel.addEventListener('open', function (event) {
-            if(dataChannel.readyState==="open"){
-                num_channel++;
-                console.log(num_channel," channels are open");
-                if(!has_request_file){
-                    dataChannel.send(JSON.stringify({head:"requestFile",content:{fileId:fileInfo.id}}));
-                    has_request_file=true;
-                }
 
-                cache.index=getDownloadIndex();
-                if(cache.index!==null) {
-                    let _index=cache.index;
-                    dataChannel.send(JSON.stringify({head: "requestSlice", content: {index: cache.index}}));
-                    setTimeout(function () {
-                        if(cache.index===_index){
-                            deliveryData(_index,null);
-                            dataChannel.close();
-                        }
-                    },1000);
-                }
-            }
-        });
-        dataChannel.addEventListener('close', function (event) {
-            num_channel--;
-            console.log("channel close");
-        });
-        dataChannel.addEventListener('error', function (error) {
-            console.log("dataChannel error");
-        });
-        dataChannel.onmessage=async function(event){
-            deliveryData(cache.index,event.data);
-            cache.index=getDownloadIndex();
-            if(cache.index!==null) {
-                let _index=cache.index;
-                dataChannel.send(JSON.stringify({head: "requestSlice", content: {index: cache.index}}));
-                setTimeout(function () {
-                    if(cache.index===_index){
-                        deliveryData(_index,null);
-                        dataChannel.close();
-                    }},500);
-            }
-        };
-    };
 
-    for(let i=0;i<dataChannels.length;i++){
-        establishChannel(dataChannels[i]);
-    }
+    // for(let i=0;i<dataChannels.length;i++){
+    //     establishChannel(dataChannels[i]);
+    // }
 
 
 
