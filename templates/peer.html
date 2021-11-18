@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WebP2P</title>
+    <title>Peeeer!</title>
     <script src="{{ url_for('static',filename='script/jquery.min.js') }}"></script>
     <script src="{{ url_for('static',filename='script/socket.io.js') }}"></script>
     <script src="{{ url_for('static',filename='script/spark-md5.min.js') }}"></script>
@@ -16,12 +16,15 @@
             });
         })
     </script>
+    <link rel="icon" type="image/png" sizes="144x144" href="{{ url_for('static',filename='image/favicon.png') }}"/>
     <link rel="stylesheet" href="{{ url_for('static',filename='style/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static',filename='style/peer.css') }}">
 </head>
 <body>
 <div id="container">
-    <h1><a href="#" >Peeeer! (beta)</a> <span>Share your file P2P</span></h1>
+    <h1><a href="#" >Peeeer! (beta)</a> <span>Share your file P2P</span><span style="float: right;font-size: 0.5em;font-family: Arial;text-align: center"><a href="https://github.com/bugs-creator"><img class="icon" src="{{ url_for('static',filename='image/github.png') }}" alt=""></a>
+        <a href="https://csgitlab.ucd.ie/bug_creator"><img class="icon" src="{{ url_for('static',filename='image/gitlab.png') }}" alt=""></a>
+        <a href="mailto:wenrui.liu@ucdconnect.ie"><img class="icon" src="{{ url_for('static',filename='image/gmail.png') }}" alt=""></a></span></h1>
     <section>
         <p>This page is a WebRTC based P2P file system, it allows you to share files peer-to-peer with others.</p>
 

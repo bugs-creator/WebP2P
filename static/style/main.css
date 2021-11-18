@@ -9,6 +9,12 @@
   display: none;
 }
 
+.icon{
+  width: 1.2em;
+  height: 1.2em;
+  margin-top: 1.0em;
+}
+
 .highlight {
   background-color: #eee;
   font-size: 1.2em;
