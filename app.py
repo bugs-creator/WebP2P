@@ -14,35 +14,34 @@ from config import Config
 async_mode = None
 
 app = Flask(__name__)
-# 加载配置文件
 app.config.from_object(Config)
-# db绑定app
 db = SQLAlchemy(app)
 import models
 from models import *
 
-# app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, async_mode=async_mode)
 thread = None
 thread_lock = Lock()
 
 
-
 @socketio.event
 def request_file(message):
+    """
+    Receive the file ID requested by the peer and returns the file information in the peer database and the peer list
+    that owns the file.
+    """
     res = Res.query.get(message["id"])
-    if(res is not None):
-        lst=[]
+    if res is not None:
+        lst = []
         for i in res.peer:
-            lst+=[i.id]
-        emit(message["id"],{'peer':lst,'fileInfo':{'id':res.id,'name':res.name,'size':res.size,'md5':res.md5}})
+            lst += [i.id]
+        emit(message["id"],
+             {'peer': lst, 'fileInfo': {'id': res.id, 'name': res.name, 'size': res.size, 'md5': res.md5}})
     else:
-        emit(message["id"],{})
-
+        emit(message["id"], {})
 
 
 def background_thread():
-    """Example of how to send server generated events to clients."""
     count = 0
     while True:
         socketio.sleep(10)
@@ -51,39 +50,55 @@ def background_thread():
                       {'data': 'Server generated event', 'count': count})
 
 
-
-
 @app.route("/")
 def peer():
+    """
+    Return the peer.html
+    """
     return render_template('peer.html', async_mode=socketio.async_mode)
 
 
 @app.route('/<file_id>')
 def peerWithStartDownload(file_id):
-    return render_template('peer.html', async_mode=socketio.async_mode,default_input=file_id)
+    """
+    Enter the page and download directly
+    """
+    return render_template('peer.html', async_mode=socketio.async_mode, default_input=file_id)
 
 
 @socketio.event
 def sendTo(message):
-    print(message)
+    """
+    Maintains communication between peers before establishing P2P connections. Mainly used for passing negotiation,
+    ICE candidate.
+    """
     emit(message["head"], {'from': request.sid, 'data': message["data"]}, to=message["target"])
 
 
 @socketio.event
 def addFile(message):
+    """
+    Receives the file information owned by the peer, uploads it to the database, enables the file tracing,
+    and returns the GUID of the file to the peer
+    """
     id = str(uuid.uuid1()).split("-")[0]
     while Res.query.get(id) is not None:
         id = str(uuid.uuid1()).split("-")[0]
-    res = models.Res(id=str(id), name=message["name"], size=message["size"],md5=message["md5"])
+    res = models.Res(id=str(id), name=message["name"], size=message["size"], md5=message["md5"])
     res.peer += [Peer.query.get(request.sid)]
     db.session.add(res)
     db.session.commit()
     emit(str(message["messageId"]), {"id": str(id)})
 
+
 @socketio.event
 def removeFile(message):
+    """
+    Delete the file owned by the peer. If no peer references the file after the relationship is deleted, the file is
+    deleted.
+    """
     peer = Peer.query.get(request.sid)
-    res=Res.query.get(message["id"])
+    res = Res.query.get(message["id"])
     peer.res.remove(res)
     if res.peer.__len__() == 0:
         db.session.delete(res)
@@ -93,7 +108,9 @@ def removeFile(message):
 
 @socketio.event
 def addReceivedFile(message):
-    print(message)
+    """
+    This method is called when a new peer owns an old file.
+    """
     res = Res.query.get(message["id"])
     res.peer += [Peer.query.get(request.sid)]
     db.session.add(res)
@@ -102,13 +119,17 @@ def addReceivedFile(message):
 
 @socketio.event
 def requestOffer(message):
-    print(message)
+    """
+    Send RTC negotiation
+    """
     emit("requestOffer", {'from': request.sid, 'offer': message["offer"]}, to=message["target"])
 
 
 @socketio.event
 def replyOffer(message):
-    print(message)
+    """
+    reply RTC negotiation
+    """
     emit("replyOffer", {'from': request.sid, 'offer': message["offer"]}, to=message["target"])
 
 
@@ -176,4 +197,4 @@ def disconnect():
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True,host="0.0.0.0",port=80)
+    socketio.run(app, debug=True, host="0.0.0.0", port=80)

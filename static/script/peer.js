@@ -1,18 +1,17 @@
 /*jshint esversion: 11 */
 'use strict';
 
-var files=[];
-var socket=io();
-var my_sid=null;
-var chunk_size=65535;
-var num_verify_chunk=32;
-const md5_length=4;
-var message_id=0;
-var table=document.getElementById("fileListTable");
-var num_work=30;
-var bufferAmountMax=16384;
+var files=[];   //Resources list, my DHRT
+var socket=io();    //websocket
+var my_sid=null;    //my peer id
+const chunk_size=65535;   //size of file chunk
+const md5_length=4;     //md5 length
+var message_id=0;   //message id
+var table=document.getElementById("fileListTable");     //my file table in peer.html
+var num_work=30;    //number of channels when RTCConnection is initialized.
 
 
+//Initialize to get my GUID
 socket.on("join",function (message){
     console.log(message);
     my_sid=message.sid;
@@ -25,18 +24,23 @@ socket.on("join",function (message){
 });
 
 
-
+/**
+ * Share a new file and notify the server
+ * @returns {Promise<void>}
+ */
 async function addFile(){
+    //Freeze the upload component while processing files
     document.getElementById("fileChooser").setAttribute("disabled","disabled");
+
+    //Gets the file upload list from the file upload component
     for (let i = 0, l = document.getElementById("fileChooser").files.length; i < l; i++) {
         let file=document.getElementById("fileChooser").files[i];
         let verify_progress=document.getElementById("verify_progress");
         let verify_info=document.getElementById("verify_info");
         let verify = null;
 
-
+        //If the verification mode is enabled, the file blocks generate md5 verification codes
         if(document.getElementById("verify_check").checked) {
-
             verify="";
             verify_info.innerText = "start verify: " + file.name;
             verify_progress.max = Math.ceil(file.size / chunk_size );
@@ -57,6 +61,7 @@ async function addFile(){
             verify_info.innerText = "verify complete!";
         }
 
+        //notify server and get file guid
         await socket.emit("addFile",{messageId:message_id,name:file.name,size:file.size,md5:verify});
         socket.on(""+message_id,function (message){
            file.id=message.id;
@@ -66,22 +71,35 @@ async function addFile(){
         });
         message_id++;
     }
+
+    //Unfreeze the upload component
     document.getElementById("fileChooser").removeAttribute("disabled");
 }
 
-async function removeFile(id){
-
-}
-
+/**
+ * Add a received file
+ * @param file
+ * @returns {Promise<void>}
+ */
 async function addReceivedFile(file){
-        await socket.emit("addReceivedFile",{messageId:message_id,id:file.id,name:file.name,size:file.size});
-        files.push(file);
-        addRow(file);
-        message_id++;
+    //Notifies the server that a file has been received
+    await socket.emit("addReceivedFile",{messageId:message_id,id:file.id,name:file.name,size:file.size});
+    //Add it to the local DHRT
+    files.push(file);
+    //Display it on the page
+    addRow(file);
+    //Update message ID
+    message_id++;
 }
 
+
+/**
+ * copy text function
+ * @param text text to be copy
+ * @param callback
+ */
 function copyText(text, callback){
-    var tag = document.createElement('input');
+    const tag = document.createElement('input');
     tag.setAttribute('id', 'cp_hgz_input');
     tag.value = text;
     document.getElementsByTagName('body')[0].appendChild(tag);
@@ -91,6 +109,10 @@ function copyText(text, callback){
     if(callback) {callback(text);}
 }
 
+/**
+ * Add a row to the table on the HTML page
+ * @param file
+ */
 function addRow(file){
     table=document.getElementById("fileListTable");
     document.getElementById("fileTablePlaceHolder").style.display="none";
@@ -150,10 +172,20 @@ function addRow(file){
     table.appendChild(tr);
 }
 
+/**
+ * like Thread.sleep() in java
+ * @param time
+ * @returns {Promise<unknown>}
+ */
 function sleep (time) {
   return new Promise((resolve) => setTimeout(resolve, time));
 }
 
+/**
+ * Change the callback read method to the blocking method. Equivalent to the Java file-reading function
+ * @param file file wait to be read
+ * @returns {Promise<unknown>|ArrayBuffer|Promise<ArrayBuffer>} arrayBuffer of the file
+ */
 function readFileAsync(file) {
     if(file instanceof File) {
         return new Promise((resolve, reject) => {
@@ -171,17 +203,28 @@ function readFileAsync(file) {
 }
 
 
-
+/**
+ * Listen for negotiation information. This method is called back when another peer requests a connection.
+ */
 socket.on("requestOffer",async function (message){
+    //Establishing a P2P Connection
     let peerConnection=await listenConnection(message.from,message.data.offer);
+    //File requested by the other party
     let file=null;
-
+    //Time of the last message
     let last_message=new Date().getTime();
 
+    /**
+     *  Get file chunk
+     * @param index The index chunk of the file
+     * @returns {*} The index cut of the file
+     */
     const getSlice = index => {
         return file.slice(index * chunk_size, (index + 1) * chunk_size);
 
     };
+
+    //Establish a data exchange channel
     peerConnection.addEventListener("datachannel",
         async function (event) {
         const dataChannel=event.channel;
@@ -197,25 +240,44 @@ socket.on("requestOffer",async function (message){
             console.log("dataChannel error");
         });
 
+        //The callback function when a message is received
         dataChannel.onmessage=async function(event){
             let data=JSON.parse(event.data);
             last_message=new Date().getTime();
             console.log("get message:\n",event.data);
+
+            //Set the timeout period. Close the connection after timeout
             setTimeout(function () {
                 if(new Date().getTime()-last_message>8000){
                     peerConnection.close();
                 }
             },8000);
+
+            //Listen for information on the requested file
             if(data.head==="requestFile"){
                 let file_item;
-                for(let item in files){
-                    file_item=files[item];
-                    if(file_item.id===data.content.fileId){
-                        file=file_item;
-                        break;
+                if(file!==null){
+                    if(file.id!==data.content.fileId){
+                        for (let item in files) {
+                            file_item = files[item];
+                            if (file_item.id === data.content.fileId) {
+                                file = file_item;
+                                break;
+                            }
+                        }
+                    }
+                }else{
+                    for (let item in files) {
+                        file_item = files[item];
+                        if (file_item.id === data.content.fileId) {
+                            file = file_item;
+                            break;
+                        }
                     }
                 }
             }
+
+            //Returns an arrayBuffer of the requested file block
             if(data.head==="requestSlice"){
                 let slice=await readFileAsync(getSlice(data.content.index));
                 console.log("send slice:\n",slice.byteLength);
@@ -226,20 +288,30 @@ socket.on("requestOffer",async function (message){
 
 });
 
-
+/**
+ * Requesting file download
+ * @param id ID of the file
+ * @returns {Promise<void>}
+ */
 async function postFile(id){
+    //Check whether the file already exists
     for(let i=0;i<files.length;i++){
         if(id===files[i].id){
             window.alert("You already have the resource.");
             return;
         }
     }
+
+    //Request the server for information about the file and the GUID of the peer who owns the file
     socket.emit("request_file",{id:id});
+
+    //Waiting for the server to reply
     socket.on(id,async function (message) {
         if(message.peer!==undefined) {
             let targets = message.peer;
             let fileInfo = message.fileInfo;
             console.log(`get file info:\n${JSON.stringify(message)} `);
+            //Requested the file from the peer.
             await getFile(targets, fileInfo);
         }else{
             window.alert("No such file!");
@@ -248,15 +320,26 @@ async function postFile(id){
     });
 }
 
+/**
+ * Requested the file from the peer
+ * @param targets peer list
+ * @param fileInfo
+ * @returns {Promise<void>}
+ */
 async function getFile(targets, fileInfo){
     let dataChannels=[];
     let num_peer=targets.length;
 
-
+    /**
+     * Initialize dataChannel
+     * @param channel
+     * @returns {Promise<void>}
+     */
     const establishChannel=async channel=>{
         const dataChannel=channel;
         let has_request_file=false;
         let cache={index:null,data:null};
+
         dataChannel.addEventListener('open', async function (event) {
             if(dataChannel.readyState==="open"){
                 num_channel++;
@@ -266,10 +349,13 @@ async function getFile(targets, fileInfo){
                     has_request_file=true;
                 }
 
+                //Gets the index of the chunk to be downloaded
                 cache.index=getDownloadIndex();
                 if(cache.index!==null) {
                     let _index=cache.index;
                     dataChannel.send(JSON.stringify({head: "requestSlice", content: {index: cache.index}}));
+
+                    //Set the timeout period and close the channel after the timeout
                     setTimeout(function () {
                         if(cache.index===_index){
                             deliveryData(_index,null);
@@ -290,7 +376,9 @@ async function getFile(targets, fileInfo){
         });
         dataChannel.onmessage=async function(event){
             console.log("get slice: \n",event.data.byteLength);
+            //Pass the received data
             deliveryData(cache.index,event.data);
+            //Download new chunk
             cache.index=getDownloadIndex();
             if(cache.index!==null) {
                 let _index=cache.index;
@@ -304,12 +392,12 @@ async function getFile(targets, fileInfo){
         };
     };
 
-
+    //Create and init all datachannel
     for(let i=0;i<targets.length;i++){
         let channels=await requestDataChannel(targets[i]);
         for(let j=0;j<channels.length;j++){
             dataChannels.push(channels[j]);
-            await establishChannel(channels[j]);
+            establishChannel(channels[j]);
         }
     }
 
@@ -346,7 +434,6 @@ async function getFile(targets, fileInfo){
     progress.max=chunk_num;
     progress.value=0;
     let text=document.createElement("label");
-
     td3.appendChild(progress);
     td3.appendChild(text);
 
@@ -373,6 +460,7 @@ async function getFile(targets, fileInfo){
     let refresh=document.createElement("a");
 
     refresh.innerText="refresh\n";
+    //Refresh the download
     refresh.onclick=async function (event) {
         for(let i=0;i<dataChannels.length;i++){
             dataChannels[i].close();
@@ -390,7 +478,7 @@ async function getFile(targets, fileInfo){
                     for(let j=0;j<channels.length;j++){
                         channels[j].bufferedAmountLowThreshold=10000;
                         dataChannels.push(channels[j]);
-                        await establishChannel(channels[j]);
+                        establishChannel(channels[j]);
                     }
                 }
 
@@ -425,23 +513,29 @@ async function getFile(targets, fileInfo){
         work_cache[i]=[];
     }
 
+
+    //Post download data
     const deliveryData=async (index,data)=>{
         if(data!==null) {
             if (!(received_data[index] instanceof ArrayBuffer)) {
+                //If validation is enabled, begin validate
                 if(verify){
                      let spark = new SparkMD5.ArrayBuffer();
                      spark.append(data);
+
+                     //verify pass
                      if(spark.end().slice(0,md5_length)===fileInfo.md5.slice(index*md5_length,(index+1)*md5_length)){
                          // console.log("verify success");
                          received_data[index] = data;
                          current_num++;
                          td4.innerText=+(current_num*chunk_size/1024/1024).toFixed(2)+"/"+(fileInfo.size/1024/1024).toFixed(2)+" Mb";
                          progress.value=current_num;
-                     }else{
+                     }else{//verify not pass
+                         wait_for_download.push(index);
                          console.log("verify fail");
                      }
                      spark.destroy();
-                }else{
+                }else{//not verify
                     received_data[index] = data;
                     current_num++;
                     td4.innerText=+(current_num*chunk_size/1024/1024).toFixed(2)+"/"+(fileInfo.size/1024/1024).toFixed(2)+" Mb";
@@ -449,12 +543,16 @@ async function getFile(targets, fileInfo){
                 }
             }
         }else{
-            if(index!==null) {
+            if(index!==null) {//Data failed, return to waiting download queue, waiting for the next download
                 wait_for_download.push(index);
             }
         }
     };
 
+    /**
+     *
+     * @returns {null|*} Gets the index that needs to be downloaded
+     */
     const getDownloadIndex=()=>{
         if(wait_for_download.length!==0) {
             return wait_for_download.pop();
@@ -463,12 +561,13 @@ async function getFile(targets, fileInfo){
     };
 
 
-
-
     let last_time=0;
     let last_number=0;
 
-
+    /**
+     * Update progress bar, download speed and other information
+     * @returns {Promise<void>}
+     */
     const update = async () => {
         while(current_num!==chunk_num){
             let number=current_num-last_number;
@@ -489,9 +588,15 @@ async function getFile(targets, fileInfo){
             document.getElementById("downloadTablePlaceHolder").style.display="table-row";
         }
     };
-    await update();
+    update();
 }
 
+/**
+ * Save the downloaded file
+ * @param fileInfo information of the file
+ * @param fileData byteArray of the file
+ * @returns {Promise<void>}
+ */
 async function saveFile(fileInfo,fileData){
     let downloadAnchor=document.createElement("a");
     const received = new Blob(fileData);
@@ -509,6 +614,12 @@ async function saveFile(fileInfo,fileData){
     addReceivedFile(received);
 }
 
+/**
+ * Creating a P2P Connection
+ * @param target target guid
+ * @param channel_num The channel number
+ * @returns {Promise<(RTCPeerConnection|any[])[]>}
+ */
 async function createPeerConnection(target,channel_num){
     let peerConnection= new RTCPeerConnection({
         iceServers: [
@@ -541,8 +652,6 @@ async function createPeerConnection(target,channel_num){
         peerConnection.addIceCandidate(message.data.ice);
     });
 
-
-
     let dataChannels=new Array(num_work);
 
     for(let i=0;i<num_work;i++){
@@ -553,8 +662,11 @@ async function createPeerConnection(target,channel_num){
     return [peerConnection,dataChannels];
 }
 
-
-
+/**
+ * Request to establish P2P data channels
+ * @param target
+ * @returns {Promise<RTCPeerConnection|*[]>}
+ */
 async function requestDataChannel(target){
     let obj=await createPeerConnection(target,num_work);
     let peerConnection=obj[0];
@@ -573,6 +685,12 @@ async function requestDataChannel(target){
     return dataChannels;
 }
 
+/**
+ *
+ * @param target
+ * @param remoteOffer
+ * @returns {Promise<RTCPeerConnection|*[]>}
+ */
 async function listenConnection(target,remoteOffer){
     console.log(`receive offer:\n${remoteOffer.sdp} `);
     let obj=await createPeerConnection(target,0);
