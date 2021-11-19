@@ -219,6 +219,7 @@ socket.on("requestOffer",async function (message){
         dataChannel.onmessage=async function(event){
             let data=JSON.parse(event.data);
             last_message=new Date().getTime();
+            console.log("get message:\n",event.data);
             setTimeout(function () {
                 if(new Date().getTime()-last_message>3000){
                     peerConnection.close();
@@ -236,6 +237,7 @@ socket.on("requestOffer",async function (message){
             }
             if(data.head==="requestSlice"){
                 let slice=await readFileAsync(getSlice(data.content.index));
+                console.log("send slice:\n",slice.byteLength);
                 dataChannel.send(slice);
             }
         };
