@@ -1,23 +1,23 @@
 # WEB-BASED P2P FILE SHARING SYSTEM
-This is a P2P file sharing system implemented by Flask. All peer operations are performed on a web page. **Only tested in Chrome kernel browser on win10.** If you meet any problems please change the environment and contact me([wenrui.liu@ucdconnect.ie]()).
+This is a P2P file sharing system implemented by Flask. All peer operations are performed on a web page. **Only tested in Chrome kernel browser on win10.** If you meet any problems please try to change the environment and contact me([wenrui.liu@ucdconnect.ie]()).
 
 
 ## Features
 ### Functions have been implemented
-- Resources tracker: The server records the resource information shared by the peer and tracks it. When a new peer obtains the resource, the server actively expands the tracker of the resource. If no peer owns the resource, the server deletes the information and tracker of the resource.
-- Chunk verify: When the peer has turned on transfer verify, files will be partitioned for hash Verify to ensure that the data is accurate and not retransmitted entirely.
-- Multi-source/multi-channel download: Multiple P2P connections are established at the same time to transfer a file to maximize the transmission speed and evenly share the bandwidth pressure of the P2P network.
-- Breakpoint resume: If the download is interrupted due to special circumstances, the peer will keep the incomplete data and continue the transmission after re-establishing the connection.
-- Nat across(maybe): The SDP protocol allows peers to carry out NAT across with the help of ICE Server. This project uses a public STUN server([stun.stunprotocol.org]()) to allow peer-to-peer connections under different NATs. But across may fail due to the type of the NAT.
+- **Resources tracker:** The server records the resource information shared by the peer and tracks it. When a new peer obtains the resource, the server actively expands the tracker of the resource. If no peer owns the resource, the server deletes the information and tracker of the resource.
+- **Chunk verify:** When the peer has turned on transfer verify, files will be partitioned for hash Verify to ensure that the data is accurate and not retransmitted entirely.
+- **Multi-source/multi-channel download:** Multiple P2P connections are established at the same time to transfer a file to maximize the transmission speed and evenly share the bandwidth pressure of the P2P network.
+- **Breakpoint resume:** If the download is interrupted due to special circumstances, the peer will keep the incomplete data and continue the transmission after re-establishing the connection.
+- **Nat across(maybe):** The SDP protocol allows peers to carry out NAT across with the help of ICE Server. This project uses a public STUN server([stun.stunprotocol.org]()) to allow peer-to-peer connections under different NATs. But across may fail due to the type of the NAT.
 
 ### Advantages
-- Easy to use: All tasks are done on the Website, and you don't need to download any plug-ins to set up a P2P transfer.
-- Robust: Multi-peer connection and multi-channel design greatly improve the stability of P2P network. Download nodes will be automatically allocated in the most reasonable way for each download, you do not need to worry about download interruptions.
+- **Easy to use:** All tasks are done on the Website, and you don't need to download any plug-ins to set up a P2P transfer.
+- **Robust:** Multi-peer connection and multi-channel design greatly improve the stability of P2P network. Download nodes will be automatically allocated in the most reasonable way for each download, you do not need to worry about download interruptions.
 
 ### Problems to be solved
-- Transmission speed limit: Some browsers seem to limit the speed of P2P connections to around 2Mb/s over a LAN.
-- File size limit: Due to security restrictions of the browser, the download party cannot write the obtained file data to hard storage in real time. It can only be stored locally after the download is complete. Therefore, it is not very friendly for devices with small memory.
-- Poor support for mobile devices: The communication quality of mobile devices is worse than that of PC, which is reflected in transmission speed, connection establishment and other aspects.
+- **Transmission speed limit:** Some browsers seem to limit the speed of P2P connections to around 2Mb/s over a LAN.
+- **File size limit:** Due to security restrictions of the browser, the download party cannot write the obtained file data to hard storage in real time. It can only be stored locally after the download is complete. Therefore, it is not very friendly for devices with small memory.
+- **Poor support for mobile devices:** The communication quality of mobile devices is worse than that of PC, which is reflected in transmission speed, connection establishment and other aspects.
 
 ## Quick start
 The demo is now available on [http://peeeer.com]() and a backup on [http://123.57.9.167](). Please contact me ([wenrui.liu@ucdconnect.ie]()) if the website collapsed.
@@ -56,7 +56,17 @@ Then open [http://127.0.0.1](), you can use this page to share your file or down
 - When the download is complete, you will see it in the File table. Click "Download" and it will be saved locally. If you do not remove it from the table, others will also be able to access the resource through you.
 
 ## System design
-![img.png](img.png)
+![img.png](net.png)
+### Overview
+- **Web server:** Responsible for providing peer page, maintaining UHPT, UHRT database and switching signaling.
+    - Database: A sqlite database contains peer, res and peer2res table. Peer table records the GUID and routing metrics of all online peers. Res table records the GUID, name, size, and MD5 of files in the P2P network. Peer2res tracks the propagation of resources between peers.
+- **ICE server:** Assist peer NAT across. It only works if the two peers are not in the same LAN.
+- **NAT:** Gateway from the subnet to the WAN.
+- **Peer:** Every node in a P2P network. In this project, peer is a web page assisted by the browser to establish P2P connections. 
+
+### Implementation
+- **Add peer:** When the website is loaded, a websocket is established to web server, and the web server will generate a GUID, records it in peer table, and returns the GUID to the peer.
 
 
-## Performance static
+
+## Performance statistic
