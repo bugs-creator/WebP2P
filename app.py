@@ -5,12 +5,10 @@ from flask import Flask, render_template, session, request, \
 from flask_socketio import SocketIO, emit, join_room, leave_room, \
     close_room, rooms, disconnect
 from flask_sqlalchemy import SQLAlchemy
-
 from config import Config
 
-# Set this variable to "threading", "eventlet" or "gevent" to test the
-# different async modes, or leave it set to None for the application to choose
-# the best option based on installed packages.
+
+
 async_mode = None
 
 app = Flask(__name__)
@@ -18,6 +16,24 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 import models
 from models import *
+
+from flask_admin import Admin, AdminIndexView, expose
+
+
+class DashboardView(AdminIndexView):
+
+    def is_visible(self):
+        return False
+
+    @expose('/')
+    def index(self):
+        return redirect('/admin/peer')
+
+
+admin = Admin(app, name='Server', template_mode='bootstrap3',index_view=DashboardView())
+
+admin.add_view(PeerModelView(Peer, db.session))
+admin.add_view(ResModelView(Res, db.session))
 
 socketio = SocketIO(app, async_mode=async_mode)
 thread = None

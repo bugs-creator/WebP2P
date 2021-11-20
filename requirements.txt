@@ -10,3 +10,4 @@ python-socketio
 six==1.11.0
 Werkzeug==0.14.1
 flask-sqlalchemy
+flask-admin

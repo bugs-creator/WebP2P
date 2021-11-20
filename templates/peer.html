@@ -22,9 +22,12 @@
 </head>
 <body>
 <div id="container">
-    <h1><a href="#" >Peeeer! (beta)</a> <span>Share your file P2P</span><span style="float: right;font-size: 0.5em;font-family: Arial;text-align: center"><a href="https://github.com/bugs-creator"><img class="icon" src="{{ url_for('static',filename='image/github.png') }}" alt=""></a>
+    <h1><a href="#" style="font-size: 1.75em;font-family: 'Consolas', 'Deja Vu Sans Mono', 'Bitstream Vera Sans Mono', monospace;color: #444444"><b>Peeeer!</b></a>
+        <span style="font-family: 'Ubuntu', 'Lucida Grande', 'Lucida Sans Unicode', 'Geneva', 'Verdana', sans-serif">Share Your File P2P</span><span style="float: right;font-size: 0.5em;font-family: Arial;text-align: center">
+        <a href="https://github.com/bugs-creator"><img class="icon" src="{{ url_for('static',filename='image/github.png') }}" alt=""></a>
         <a href="https://csgitlab.ucd.ie/bug_creator"><img class="icon" src="{{ url_for('static',filename='image/gitlab.png') }}" alt=""></a>
         <a href="mailto:wenrui.liu@ucdconnect.ie"><img class="icon" src="{{ url_for('static',filename='image/gmail.png') }}" alt=""></a></span></h1>
+
     <section>
         <p>This page is a WebRTC based P2P file system, it allows you to share files peer-to-peer with others.</p>
 
@@ -43,6 +46,7 @@
         <label id="my_sid" style="display: inline;width: fit-content;color: #444444"  ></label>
     </section>
     <section>
+        <h2>Download File:</h2>
         <form id="test_connect" method="POST" action="#" style="display: inline">
             <label for="target">Request file: </label><input type="text" id="target" style="margin-right: 1em;margin-left: 1em" value="{{ default_input }}" readonly="readonly">
             <input type="submit" id="requestFile" value="request" class=input_out onmousemove="this.className='input_move'" onmouseout="this.className='input_out'">
@@ -66,6 +70,7 @@
     </div>
     </section>
     <section>
+        <h2>My File:</h2>
         <div>
             <form style="display: inline">
                 <label>Share your file: </label><input id="fileChooser" type="file" multiple="multiple" onchange="addFile()" style="margin-right:0;margin-left: 1em;padding-right: 0">
