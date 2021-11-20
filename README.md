@@ -24,16 +24,16 @@ The demo is now available on [http://peeeer.com]() and a backup on [http://123.5
 
 If you want to deploy on your own environment, please following the instruction below.
 
-initialize:
+download requirements:
 ```shell
 pip install -r requirements.txt
-flask shell 
 ```
 
 build database:
-```python
-from app import db
-db.create_all()
+```
+flask shell
+> from app import db
+> db.create_all()
 ```
 
 start server:
@@ -71,8 +71,37 @@ Then open [http://127.0.0.1](), you can use this page to share your file or down
     - The process of establishing RTCPeerConnection also requires the assistance from web server, which acts as a signaling server and transmits negotiation information and ICE candidate information of both peers.
     - If the two peers that establish the connection are on the same LAN, the P2P connection has been completed after exchanging ICE candidates (Peer B and peer C in the figure above). Otherwise, the ICE Server is required to establish the connection (Peer A and Peer B in the figure above).
 - **File transfer:** In order to ensure the transmission speed and share the pressure of each node in P2P network, file transfer adopts the design of multi-peer connection. The recipient will maintain the _wait_for_download_ and _received_slice_ queues during transmission. When the data channel is opened, the receiver will pop an element from the _wait_for_download_ queue and send the index of the element to the other end of the channel. After receiving the element, the sender will return the corresponding slice. If verify is enabled, the receiver will perform MD5 verification on the received slice, then the slice will be added to the _received_slice_ queue. If a channel has not received any messages for a period of time or has been receiving error messages for a long time, the channel will be closed and index is pushed to the _wait_for_download_ queue, waiting for another channel to re-download.
-    - ![img.png](img.png)
 
+![img.png](filetransfer.png)
 
-
+  
 ## Performance statistic
+### Detail
+- Server: centos 7; 2 cpu; 4G RAM; Locate HongKong; 1M bandwidth; Ping 130ms
+- Peer: win10 Chrome/Edge
+- Network: HUAWEI P30 4G hotspot
+
+### Speed statistic
+| receiver Info| sender Info | network | avg speed | max speed |
+|:----:|:----:|:----:|:----:|:----:|
+| 1 peer(Chrome) | 1 peer(Chrome)  | same device | 17Mb/s | 18.5Mb/s|
+| 1 peer(Edge) | 1 peer(Edge) | same device | 17Mb/s | 18.5Mb/s|
+| 1 peer(Edge) | 1 peer(Chrome) | same device | 26Mb/s | 28Mb/s|
+| 1 peer(Chrome) | 1 peer(Edge) | same device | 26Mb/s | 28Mb/s|
+| 1 peer(Chrome) | 1 peer(Chrome)  | LAN(mobile hotspot) | 1.5Mb/s | 2Mb/s|
+| 1 peer(Edge) | 1 peer(Edge)  | LAN(mobile hotspot) | 1.5Mb/s | 2Mb/s|
+| 2 peer(Chrome) | 1 peer(Chrome)  | LAN(mobile hotspot) | 1Mb/s | 1.2Mb/s|
+| 1 peer(Chrome) | 2 peer(Chrome)  | LAN(mobile hotspot) | 2Mb/s | 2.5Mb/s|
+| 1 peer(Chrome) | 1 peer(Chrome)  | WAN(mobile hotspot) | 1Mb/s | 1.5Mb/s|
+
+### Server statistic
+| operation | cost | 
+|:----:|:----:|
+|load page| 1000~2000ms |
+|add resource| 150~250ms |
+|get resource| 150~250ms |
+
+### Other statistic
+- Concurrent: Limited personal equipment, only 30 peers were tested at the same time, and no obvious delay was felt.
+- Number of channels: After stability, each peer maintains about 15 channels for data exchange.
+- Connection initialization cost: About 500~1000ms on PC. Mobile devices need more time to establish connections, and sometimes the establishment fails. The cause of this phenomenon has not been found yet.
