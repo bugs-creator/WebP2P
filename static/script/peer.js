@@ -4,7 +4,7 @@
 var files=[];   //Resources list, my DHRT
 var socket=io();    //websocket
 var my_sid=null;    //my peer id
-const chunk_size=65535;   //size of file chunk
+const chunk_size=32768;   //size of file chunk
 const md5_length=4;     //md5 length
 var message_id=0;   //message id
 var table=document.getElementById("fileListTable");     //my file table in peer.html
@@ -258,6 +258,7 @@ socket.on("requestOffer",async function (message){
                 let file_item;
                 if(file!==null){
                     if(file.id!==data.content.fileId){
+                        console.log("request file: \n",event.data);
                         for (let item in files) {
                             file_item = files[item];
                             if (file_item.id === data.content.fileId) {
@@ -267,6 +268,7 @@ socket.on("requestOffer",async function (message){
                         }
                     }
                 }else{
+                    console.log("request file: \n",event.data);
                     for (let item in files) {
                         file_item = files[item];
                         if (file_item.id === data.content.fileId) {
@@ -279,8 +281,8 @@ socket.on("requestOffer",async function (message){
 
             //Returns an arrayBuffer of the requested file block
             if(data.head==="requestSlice"){
+                console.log("request slice: \n",event.data);
                 let slice=await readFileAsync(getSlice(data.content.index));
-                console.log("send slice:\n",slice.byteLength);
                 dataChannel.send(slice);
             }
         };
@@ -354,7 +356,7 @@ async function getFile(targets, fileInfo){
                 if(cache.index!==null) {
                     let _index=cache.index;
                     dataChannel.send(JSON.stringify({head: "requestSlice", content: {index: cache.index}}));
-
+                    console.log("request slice \n", _index);
                     //Set the timeout period and close the channel after the timeout
                     setTimeout(function () {
                         if(cache.index===_index){
