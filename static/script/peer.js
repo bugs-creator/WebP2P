@@ -630,6 +630,7 @@ async function createPeerConnection(target,channel_num){
             }]
     });
 
+
     peerConnection.addEventListener('icecandidate', async event => {
         console.log(`my ICE candidate:\n${event.candidate} `);
         socket.emit("sendTo",{target:target,head:"ICE:"+my_sid,data:{ice:event.candidate}});
