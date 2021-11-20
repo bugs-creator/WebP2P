@@ -62,10 +62,16 @@ Then open [http://127.0.0.1](), you can use this page to share your file or down
     - Database: A sqlite database contains peer, res and peer2res table. Peer table records the GUID and routing metrics of all online peers. Res table records the GUID, name, size, and MD5 of files in the P2P network. Peer2res tracks the propagation of resources between peers.
 - **ICE server:** Assist peer NAT across. It only works if the two peers are not in the same LAN.
 - **NAT:** Gateway from the subnet to the WAN.
-- **Peer:** Every node in a P2P network. In this project, peer is a web page assisted by the browser to establish P2P connections. 
+- **Peer:** Every node in a P2P network. In this project, peer is a web page assisted by the browser to establish P2P connections, also maintain a DHRT record of the files you add or download.
 
 ### Implementation
 - **Add peer:** When the website is loaded, a websocket is established to web server, and the web server will generate a GUID, records it in peer table, and returns the GUID to the peer.
+- **Add resource:** Add a local file and upload the file information to the server. If file verification is enabled, the peer will calculate the MD5 value for the file and uploads the file to the server. After receiving file, the server randomly generates the GUID, saves the file to its UHRT, starts tracing the resource, and returns the generated GUID. After receiving the GUID, the peer records the file to its DHRT.
+- **Get resource:** Sends the GUID of the request resource to the server. The server retrieve all the peers with the resource from the database and returns the list of peers with higher routing metrics. After receiving the post-message, the peer establishes RTCPeerConnection with all candidate peers for P2P communication.
+    - The process of establishing RTCPeerConnection also requires the assistance from web server, which acts as a signaling server and transmits negotiation information and ICE candidate information of both peers.
+    - If the two peers that establish the connection are on the same LAN, the P2P connection has been completed after exchanging ICE candidates (Peer B and peer C in the figure above). Otherwise, the ICE Server is required to establish the connection (Peer A and Peer B in the figure above).
+- **File transfer:** In order to ensure the transmission speed and share the pressure of each node in P2P network, file transfer adopts the design of multi-peer connection. The recipient will maintain the _wait_for_download_ and _received_slice_ queues during transmission. When the data channel is opened, the receiver will pop an element from the _wait_for_download_ queue and send the index of the element to the other end of the channel. After receiving the element, the sender will return the corresponding slice. If verify is enabled, the receiver will perform MD5 verification on the received slice, then the slice will be added to the _received_slice_ queue. If a channel has not received any messages for a period of time or has been receiving error messages for a long time, the channel will be closed and index is pushed to the _wait_for_download_ queue, waiting for another channel to re-download.
+    - ![img.png](img.png)
 
 
 

@@ -414,7 +414,7 @@ async function getFile(targets, fileInfo){
     let work_cache=new Array(num_workers);
     let num_channel=0;
 
-    let received_data=new Array(chunk_num);
+    let received_slice=new Array(chunk_num);
     let wait_for_download=[];
 
 
@@ -519,7 +519,7 @@ async function getFile(targets, fileInfo){
     //Post download data
     const deliveryData=async (index,data)=>{
         if(data!==null) {
-            if (!(received_data[index] instanceof ArrayBuffer)) {
+            if (!(received_slice[index] instanceof ArrayBuffer)) {
                 //If validation is enabled, begin validate
                 if(verify){
                      let spark = new SparkMD5.ArrayBuffer();
@@ -528,7 +528,7 @@ async function getFile(targets, fileInfo){
                      //verify pass
                      if(spark.end().slice(0,md5_length)===fileInfo.md5.slice(index*md5_length,(index+1)*md5_length)){
                          // console.log("verify success");
-                         received_data[index] = data;
+                         received_slice[index] = data;
                          current_num++;
                          td4.innerText=+(current_num*chunk_size/1024/1024).toFixed(2)+"/"+(fileInfo.size/1024/1024).toFixed(2)+" Mb";
                          progress.value=current_num;
@@ -538,7 +538,7 @@ async function getFile(targets, fileInfo){
                      }
                      spark.destroy();
                 }else{//not verify
-                    received_data[index] = data;
+                    received_slice[index] = data;
                     current_num++;
                     td4.innerText=+(current_num*chunk_size/1024/1024).toFixed(2)+"/"+(fileInfo.size/1024/1024).toFixed(2)+" Mb";
                     progress.value=current_num;
@@ -582,7 +582,7 @@ async function getFile(targets, fileInfo){
         }
         let data=[];
         for(let i=0;i<chunk_num;i++){
-            data.push(received_data[i]);
+            data.push(received_slice[i]);
         }
         await saveFile(fileInfo, data);
         tr.remove();
