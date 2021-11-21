@@ -7,7 +7,7 @@ from datetime import datetime
 class Peer(db.Model):
     __tablename__ = 'peer'
     id = db.Column(db.String, primary_key=True)
-    routing_metric=db.Column(db.Integer,default=10)
+    routing_metric = db.Column(db.Integer, default=10)
     last_update = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     res = db.relationship("Res", backref="peer", secondary="peer2res")
 
@@ -25,16 +25,15 @@ peer2res = db.Table('peer2res',
                     db.Column('res', db.String, db.ForeignKey('res.id'))
                     )
 
-
 class PeerModelView(ModelView):
-    column_list = ('id',"routing_metric","last_update","res")
+    column_list = ('id', "routing_metric", "last_update", "res")
     can_create = False
     can_delete = False
     can_edit = False
+
 
 class ResModelView(ModelView):
-    column_list = ('id',"name","size","md5")
+    column_list = ('id', "name", "size", "md5")
     can_create = False
     can_delete = False
     can_edit = False
-

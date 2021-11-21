@@ -13,13 +13,11 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
 import models
-from models import Peer,Res,PeerModelView,ResModelView
-
+from models import *
 from flask_admin import Admin, AdminIndexView, expose
 
 
 class DashboardView(AdminIndexView):
-
     def is_visible(self):
         return False
 
@@ -30,15 +28,17 @@ class DashboardView(AdminIndexView):
 
 admin = Admin(app, name='Server', template_mode='bootstrap3', index_view=DashboardView())
 
-admin.add_view(PeerModelView(Peer, db.session))
-admin.add_view(ResModelView(Res, db.session))
+admin.add_view(PeerModelView(models.Peer, db.session))
+admin.add_view(ResModelView(models.Res, db.session))
 
 socketio = SocketIO(app, async_mode=async_mode)
 thread = None
 thread_lock = Lock()
 
+
 def takeRoutingMetric(elem):
     return elem.routing_metric
+
 
 @socketio.event
 def request_file(message):
@@ -52,9 +52,9 @@ def request_file(message):
         for i in res.peer:
             lst += [i]
         lst.sort(key=takeRoutingMetric)
-        _lst=[]
+        _lst = []
         for i in lst[:10]:
-            _lst+=[i.id]
+            _lst += [i.id]
         emit(message["id"],
              {'peer': _lst, 'fileInfo': {'id': res.id, 'name': res.name, 'size': res.size, 'md5': res.md5}})
     else:
