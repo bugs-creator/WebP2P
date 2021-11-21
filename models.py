@@ -27,8 +27,14 @@ peer2res = db.Table('peer2res',
 
 
 class PeerModelView(ModelView):
-    column_list = ('id',"last_update","res")
+    column_list = ('id',"routing_metric","last_update","res")
+    can_create = False
+    can_delete = False
+    can_edit = False
 
 class ResModelView(ModelView):
     column_list = ('id',"name","size","md5")
+    can_create = False
+    can_delete = False
+    can_edit = False
 

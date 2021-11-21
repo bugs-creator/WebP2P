@@ -7,8 +7,6 @@ from flask_socketio import SocketIO, emit, join_room, leave_room, \
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 
-
-
 async_mode = None
 
 app = Flask(__name__)
@@ -30,7 +28,7 @@ class DashboardView(AdminIndexView):
         return redirect('/admin/peer')
 
 
-admin = Admin(app, name='Server', template_mode='bootstrap3',index_view=DashboardView())
+admin = Admin(app, name='Server', template_mode='bootstrap3', index_view=DashboardView())
 
 admin.add_view(PeerModelView(Peer, db.session))
 admin.add_view(ResModelView(Res, db.session))
@@ -39,6 +37,8 @@ socketio = SocketIO(app, async_mode=async_mode)
 thread = None
 thread_lock = Lock()
 
+def takeRoutingMetric(elem):
+    return elem.routing_metric
 
 @socketio.event
 def request_file(message):
@@ -50,9 +50,13 @@ def request_file(message):
     if res is not None:
         lst = []
         for i in res.peer:
-            lst += [i.id]
+            lst += [i]
+        lst.sort(key=takeRoutingMetric)
+        _lst=[]
+        for i in lst[:10]:
+            _lst+=[i.id]
         emit(message["id"],
-             {'peer': lst, 'fileInfo': {'id': res.id, 'name': res.name, 'size': res.size, 'md5': res.md5}})
+             {'peer': _lst, 'fileInfo': {'id': res.id, 'name': res.name, 'size': res.size, 'md5': res.md5}})
     else:
         emit(message["id"], {})
 
@@ -155,14 +159,6 @@ def my_event(message):
     print("get event: " + request.sid)
     emit('my_response',
          {'data': message['data'], 'count': session['receive_count']})
-
-
-@socketio.event
-def my_broadcast_event(message):
-    session['receive_count'] = session.get('receive_count', 0) + 1
-    emit('my_response',
-         {'data': message['data'], 'count': session['receive_count']},
-         broadcast=True)
 
 
 @socketio.event
