@@ -13,7 +13,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
 import models
-from models import *
+from models import Peer,Res,PeerModelView,ResModelView
 
 from flask_admin import Admin, AdminIndexView, expose
 
