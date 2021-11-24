@@ -38,7 +38,7 @@ flask shell
 
 start server:
 ```shell
-python app.py
+flask run -h 0.0.0.0 -p 80
 ```
 
 Then open [http://127.0.0.1](), you can use this page to share your file or download file.
